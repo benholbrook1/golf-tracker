@@ -713,9 +713,9 @@ Run with: open `app/seed.tsx` in the simulator and tap **Run seed** (recommended
 **Goal**: Analytics dashboard works, scorecard scanner creates a course.
 
 - [x] `utils/handicap.ts` — `HandicapEngine` exists early (includes `getHandicapIndex()` + `saveDifferential()`); polish/UI belongs here
-- [ ] `components/HandicapBadge.tsx` — displays current index, handles null (< 3 rounds)
-- [ ] `hooks/useStats.ts` — all analytics queries from Section 10
-- [ ] `app/(tabs)/two.tsx` (Stats tab) — putts trend, GIR%, fairway%, score trend chart
+- [x] `components/HandicapBadge.tsx` — displays current index, handles null (< 3 rounds)
+- [x] `hooks/useStats.ts` — stats aggregates + trends (implemented with Drizzle selects + in-JS aggregates; avoids raw `sql` template fragments)
+- [x] `app/(tabs)/two.tsx` (Stats tab) — dashboard: GIR%, FW% (par 3 excluded), avg putts/hole, last-10 score/putts spark bars, avg putts-by-hole grid
 - [ ] `utils/scorecardParser.ts` — provider-agnostic vision parse + Zod validation
 - [ ] `app/course/scan.tsx` — camera capture, parse, editable review, confirm to DB
 - [ ] `app/course/new.tsx` — manual course entry fallback (same DB writes as scanner confirm)
@@ -765,4 +765,4 @@ These are explicitly deferred. Do not implement during MVP phases.
 
 ---
 
-*Last updated: 2026-04-24 — Phase 1–2 implemented in-repo; Phase 3+ still pending.*
+*Last updated: 2026-04-24 — Phase 1–2 implemented; Phase 3 stats implemented; scanner still pending.*
