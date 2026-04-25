@@ -1,11 +1,11 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Tabs } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { colors, radius, typography } from '@/theme/tokens';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -17,33 +17,27 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const _ = colorScheme; // reserved for future dark mode tokens
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textDisabled,
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: false,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
+        headerShown: false,
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconPill, focused && styles.iconPillOn]}>
+              <FontAwesome size={22} name="home" color={color} />
+            </View>
           ),
         }}
       />
@@ -51,23 +45,56 @@ export default function TabLayout() {
         name="courses"
         options={{
           title: 'Courses',
-          tabBarIcon: ({ color }) => <TabBarIcon name="flag" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconPill, focused && styles.iconPillOn]}>
+              <FontAwesome size={22} name="flag" color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="rounds"
         options={{
           title: 'Rounds',
-          tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconPill, focused && styles.iconPillOn]}>
+              <FontAwesome size={22} name="list" color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="two"
         options={{
           title: 'Stats',
-          tabBarIcon: ({ color }) => <TabBarIcon name="line-chart" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconPill, focused && styles.iconPillOn]}>
+              <FontAwesome size={22} name="line-chart" color={color} />
+            </View>
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: colors.surfaceBright,
+    borderTopColor: colors.outlineVariant,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 10,
+    paddingBottom: 12,
+    height: 70,
+  },
+  iconPill: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPillOn: {
+    backgroundColor: colors.primaryContainer,
+  },
+});
