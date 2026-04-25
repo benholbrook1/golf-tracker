@@ -1,7 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Themed';
-import { getScoreLabel } from '@/constants/golf';
+import { getScoreLabel, scoreColors } from '@/constants/golf';
+import { colors, radius, space, typography } from '@/theme/tokens';
 
 type Row = {
   globalHole: number;
@@ -11,25 +12,35 @@ type Row = {
 
 export function ScoreCard({ rows }: { rows: Row[] }) {
   return (
-    <View style={styles.container}>
-      <View style={[styles.row, styles.header]}>
-        <Text style={[styles.cell, styles.hole]}>Hole</Text>
-        <Text style={[styles.cell, styles.par]}>Par</Text>
-        <Text style={[styles.cell, styles.score]}>Score</Text>
-        <Text style={[styles.cell, styles.label]}>Result</Text>
+    <View style={styles.table}>
+      {/* Header */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.cell, styles.cellHole, styles.headerText]}>Hole</Text>
+        <Text style={[styles.cell, styles.cellPar, styles.headerText]}>Par</Text>
+        <Text style={[styles.cell, styles.cellScore, styles.headerText]}>Score</Text>
+        <Text style={[styles.cell, styles.cellLabel, styles.headerText]}>Result</Text>
       </View>
 
-      {rows.map((r) => {
-        const diff = r.strokes == null ? null : r.strokes - r.par;
-        const tint =
-          diff == null ? undefined : diff <= -1 ? styles.good : diff === 0 ? styles.ok : styles.bad;
-
+      {rows.map((r, i) => {
+        const sc = r.strokes != null ? scoreColors(r.strokes, r.par) : null;
+        const even = i % 2 === 0;
         return (
-          <View key={r.globalHole} style={[styles.row, tint]}>
-            <Text style={[styles.cell, styles.hole]}>{r.globalHole}</Text>
-            <Text style={[styles.cell, styles.par]}>{r.par}</Text>
-            <Text style={[styles.cell, styles.score]}>{r.strokes ?? '—'}</Text>
-            <Text style={[styles.cell, styles.label]}>
+          <View
+            key={r.globalHole}
+            style={[styles.bodyRow, even ? styles.rowEven : styles.rowOdd]}
+          >
+            <Text style={[styles.cell, styles.cellHole, styles.bodyText]}>{r.globalHole}</Text>
+            <Text style={[styles.cell, styles.cellPar, styles.bodyText]}>{r.par}</Text>
+            <View style={styles.cellScore}>
+              {r.strokes != null && sc ? (
+                <View style={[styles.badge, { backgroundColor: sc.bg, borderColor: sc.border ?? 'transparent' }]}>
+                  <Text style={[styles.badgeText, { color: sc.text }]}>{r.strokes}</Text>
+                </View>
+              ) : (
+                <Text style={[styles.cell, styles.bodyText, { color: colors.textDisabled }]}>—</Text>
+              )}
+            </View>
+            <Text style={[styles.cell, styles.cellLabel, styles.bodyText, { color: sc ? undefined : colors.textDisabled }]}>
               {r.strokes == null ? '—' : getScoreLabel(r.strokes, r.par)}
             </Text>
           </View>
@@ -40,48 +51,56 @@ export function ScoreCard({ rows }: { rows: Row[] }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  table: {
     borderWidth: 1,
-    borderColor: '#999',
-    borderRadius: 12,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
-  header: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-  },
-  row: {
+  headerRow: {
     flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.08)',
     alignItems: 'center',
+    backgroundColor: colors.surfaceContainer,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    gap: space[2],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
   },
-  cell: {
-    fontSize: 14,
+  bodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    gap: space[2],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.outlineVariant,
+  },
+  rowEven: { backgroundColor: colors.surfaceBright },
+  rowOdd: { backgroundColor: colors.surface },
+
+  cell: { },
+  cellHole: { width: 40 },
+  cellPar: { width: 36 },
+  cellScore: { width: 52, alignItems: 'center' },
+  cellLabel: { flex: 1 },
+
+  headerText: { ...typography.labelS, color: colors.textMuted },
+  bodyText: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
+
+  badge: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 13,
     fontWeight: '600',
-  },
-  hole: {
-    width: 44,
-  },
-  par: {
-    width: 40,
-  },
-  score: {
-    width: 56,
-  },
-  label: {
-    flex: 1,
-  },
-  good: {
-    backgroundColor: 'rgba(46, 204, 113, 0.10)',
-  },
-  ok: {
-    backgroundColor: 'rgba(52, 152, 219, 0.06)',
-  },
-  bad: {
-    backgroundColor: 'rgba(231, 76, 60, 0.08)',
+    fontVariant: ['tabular-nums'],
+    lineHeight: 16,
   },
 });
-

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { ScoreCard } from '@/components/ScoreCard';
+import { colors, radius, space, typography } from '@/theme/tokens';
 
 type Props = {
   totalScore: number;
@@ -14,6 +15,31 @@ type Props = {
   scoreRows: Array<{ globalHole: number; par: number; strokes: number | null }>;
   onEditHole: (globalHole: number) => void;
 };
+
+function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={[sStyles.card, highlight && sStyles.cardHighlight]}>
+      <Text style={[sStyles.label, highlight && sStyles.labelHighlight]}>{label}</Text>
+      <Text style={[sStyles.value, highlight && sStyles.valueHighlight]}>{value}</Text>
+    </View>
+  );
+}
+
+const sStyles = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.md,
+    padding: space[3],
+    gap: space[1],
+    alignItems: 'center',
+  },
+  cardHighlight: { backgroundColor: colors.primaryContainer },
+  label: { ...typography.labelS, color: colors.textMuted, textAlign: 'center' },
+  labelHighlight: { color: colors.onPrimaryContainer },
+  value: { fontSize: 22, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+  valueHighlight: { color: colors.primary, fontSize: 26 },
+});
 
 export function RoundSummary({
   totalScore,
@@ -31,41 +57,41 @@ export function RoundSummary({
 
   return (
     <View style={styles.container}>
+      {/* Score hero */}
       <View style={styles.hero}>
-        <Text style={styles.heroScore}>{totalScore}</Text>
-        <Text style={styles.heroSub}>vs Par {diffLabel}</Text>
-        {differential != null ? <Text style={styles.heroSub}>Differential: {differential.toFixed(1)}</Text> : null}
+        <View style={styles.heroLeft}>
+          <Text style={styles.heroScore}>{totalScore}</Text>
+          <Text style={styles.heroSub}>vs par {diffLabel}</Text>
+        </View>
+        {differential != null ? (
+          <View style={styles.heroDiff}>
+            <Text style={styles.heroDiffLabel}>Differential</Text>
+            <Text style={styles.heroDiffValue}>{differential.toFixed(1)}</Text>
+          </View>
+        ) : null}
       </View>
 
+      {/* Stats */}
       <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Avg putts</Text>
-          <Text style={styles.statValue}>{avgPutts == null ? '—' : avgPutts.toFixed(1)}</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>GIR%</Text>
-          <Text style={styles.statValue}>{girPct == null ? '—' : `${Math.round(girPct)}%`}</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>FW%</Text>
-          <Text style={styles.statValue}>{fairwayPct == null ? '—' : `${Math.round(fairwayPct)}%`}</Text>
-        </View>
+        <StatCard label="Avg putts" value={avgPutts == null ? '—' : avgPutts.toFixed(1)} highlight />
+        <StatCard label="GIR" value={girPct == null ? '—' : `${Math.round(girPct)}%`} />
+        <StatCard label="Fairway" value={fairwayPct == null ? '—' : `${Math.round(fairwayPct)}%`} />
+        <StatCard label="Penalties" value={String(totalPenalties)} />
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Penalties</Text>
-          <Text style={styles.statValue}>{totalPenalties}</Text>
-        </View>
-      </View>
-
+      {/* Scorecard */}
       <Text style={styles.sectionTitle}>Scorecard</Text>
       <ScoreCard rows={scoreRows} />
 
-      <Text style={styles.sectionTitle}>Edit</Text>
+      {/* Edit holes quick access */}
+      <Text style={styles.sectionTitle}>Edit hole</Text>
       <View style={styles.editGrid}>
         {scoreRows.map((r) => (
-          <Pressable key={r.globalHole} style={styles.editBtn} onPress={() => onEditHole(r.globalHole)}>
+          <Pressable
+            key={r.globalHole}
+            style={({ pressed }) => [styles.editBtn, pressed && styles.editBtnPressed]}
+            onPress={() => onEditHole(r.globalHole)}
+          >
             <Text style={styles.editBtnText}>{r.globalHole}</Text>
           </Pressable>
         ))}
@@ -75,67 +101,50 @@ export function RoundSummary({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 16,
-  },
+  container: { gap: space[5] },
+
   hero: {
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#999',
-    gap: 4,
+    borderColor: colors.outlineVariant,
+    padding: space[5],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
   },
+  heroLeft: { gap: space[1] },
   heroScore: {
-    fontSize: 40,
-    fontWeight: '900',
-  },
-  heroSub: {
-    fontSize: 16,
-    fontWeight: '600',
-    opacity: 0.85,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  stat: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#999',
-    gap: 2,
-  },
-  statLabel: {
-    fontSize: 12,
+    fontSize: 52,
     fontWeight: '700',
-    opacity: 0.75,
+    color: colors.text,
+    lineHeight: 56,
+    fontVariant: ['tabular-nums'],
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  editGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  heroSub: { ...typography.bodyM, color: colors.textMuted },
+  heroDiff: { alignItems: 'flex-end', gap: space[1] },
+  heroDiffLabel: { ...typography.labelS, color: colors.textMuted },
+  heroDiffValue: { fontSize: 28, fontWeight: '700', color: colors.primary, fontVariant: ['tabular-nums'] },
+
+  statsRow: { flexDirection: 'row', gap: space[2] },
+
+  sectionTitle: { ...typography.labelM, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  editGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   editBtn: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#999',
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceBright,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
+  editBtnPressed: { backgroundColor: colors.surfaceContainer },
+  editBtnText: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
 });
-

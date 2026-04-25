@@ -12,6 +12,7 @@ export const db = drizzle(sqlite, { schema });
 // Call once at app startup in app/_layout.tsx before any screen renders
 export async function runMigrations(): Promise<void> {
   await migrate(db, migrations);
+
   await backfillCourseTeeDataIfNeeded(db);
 }
 

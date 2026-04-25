@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { HoleEntry } from '@/components/HoleEntry';
 import { RoundSummary } from '@/components/RoundSummary';
 import { HandicapEngine } from '@/utils/handicap';
 import { useRound } from '@/hooks/useRound';
+import { scoreColors } from '@/constants/golf';
+import { colors, radius, space, typography } from '@/theme/tokens';
 import type { HoleScoreInput } from '@/utils/validators';
 
 type Mode = 'score' | 'summary';
@@ -22,6 +24,7 @@ export default function RoundPlayScreen() {
 }
 
 function RoundPlayInner() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string; hole?: string; tab?: Mode }>();
   const roundId = params.id ?? null;
   const initialHole = params.hole ? Number(params.hole) : 1;
@@ -43,36 +46,40 @@ function RoundPlayInner() {
   }, [holeNumberGlobal, maxGlobal]);
 
   useEffect(() => {
-    // Keep the active hole chip visible when using Prev/Next.
-    // Based on chip width (40) + gap (8) from styles.
-    if (!holeStripRef.current) return;
-    if (maxGlobal <= 0) return;
+    if (!holeStripRef.current || maxGlobal <= 0) return;
     const unit = 48;
     const x = Math.max(0, (holeNumberGlobal - 1) * unit - unit * 2);
     holeStripRef.current.scrollTo({ x, y: 0, animated: true });
   }, [holeNumberGlobal, maxGlobal]);
 
+  // Map global hole → {strokes, par} for colour-coding the strip
+  const scoreByGlobal = useMemo(() => {
+    const m = new Map<number, { strokes: number; par: number }>();
+    for (const rn of roundNines) {
+      const offset = (rn.nineOrder - 1) * 9;
+      for (const ch of rn.courseHoles) {
+        const scored = rn.holes.find((h) => h.holeNumber === ch.holeNumber);
+        if (scored) m.set(offset + ch.holeNumber, { strokes: scored.strokes, par: ch.par });
+      }
+    }
+    return m;
+  }, [roundNines]);
+
   const resolved = useMemo(() => {
     if (!round || roundNines.length === 0) return null;
-    if (!Number.isFinite(holeNumberGlobal) || holeNumberGlobal < 1) return null;
-    if (holeNumberGlobal > maxGlobal) return null;
-
+    if (!Number.isFinite(holeNumberGlobal) || holeNumberGlobal < 1 || holeNumberGlobal > maxGlobal) return null;
     const nineOrder = Math.ceil(holeNumberGlobal / 9);
     const holeNumberWithinNine = ((holeNumberGlobal - 1) % 9) + 1;
     const rn = roundNines.find((n) => n.nineOrder === nineOrder);
     if (!rn) return null;
-
     const courseHole = rn.courseHoles.find((h) => h.holeNumber === holeNumberWithinNine);
     if (!courseHole) return null;
-
     const existing = rn.holes.find((hs) => hs.holeNumber === holeNumberWithinNine) ?? null;
-
     return { rn, courseHole, existing, holeNumberWithinNine };
   }, [round, roundNines, holeNumberGlobal, maxGlobal]);
 
   const computedSummary = useMemo(() => {
     if (!round || roundNines.length === 0) return null;
-
     const rows: Array<{ globalHole: number; par: number; strokes: number | null }> = [];
     for (const rn of roundNines) {
       const offset = (rn.nineOrder - 1) * 9;
@@ -82,30 +89,20 @@ function RoundPlayInner() {
       }
     }
     rows.sort((a, b) => a.globalHole - b.globalHole);
-
     const totalPar = rows.reduce((s, r) => s + r.par, 0);
     const putts = roundNines.flatMap((rn) => rn.holes.map((h) => h.putts));
     const avgPutts = putts.length ? putts.reduce((s, p) => s + p, 0) / putts.length : null;
-
     const girs = roundNines.flatMap((rn) => rn.holes.map((h) => (h.gir ? 1 : 0))) as number[];
     const girPct = girs.length ? (girs.reduce((s, v) => s + v, 0) / girs.length) * 100 : null;
-
     const fairways = roundNines.flatMap((rn) => rn.holes.map((h) => (h.fairwayHit ? 1 : 0))) as number[];
     const fairwayPct = fairways.length ? (fairways.reduce((s, v) => s + v, 0) / fairways.length) * 100 : null;
-
-    const penalties = roundNines.flatMap((rn) => rn.holes.map((h) => h.penalties ?? 0));
-    const totalPenalties = penalties.reduce((s, p) => s + p, 0);
-
+    const totalPenalties = roundNines.flatMap((rn) => rn.holes.map((h) => h.penalties ?? 0)).reduce((s, p) => s + p, 0);
     return { rows, totalPar, avgPutts, girPct, fairwayPct, totalPenalties };
   }, [round, roundNines]);
 
   useEffect(() => {
-    if (!roundId || !round) return;
-    if (!round.isComplete) return;
-    if (round.handicapDifferential != null) return;
-    HandicapEngine.saveDifferential(roundId)
-      .then(refresh)
-      .catch(() => {});
+    if (!roundId || !round || !round.isComplete || round.handicapDifferential != null) return;
+    HandicapEngine.saveDifferential(roundId).then(refresh).catch(() => {});
   }, [roundId, round, refresh]);
 
   const onSave = async (data: HoleScoreInput) => {
@@ -117,9 +114,9 @@ function RoundPlayInner() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.container}>
-          <Text>Loading…</Text>
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <View style={styles.center}>
+          <Text style={styles.muted}>Loading…</Text>
         </View>
       </SafeAreaView>
     );
@@ -127,11 +124,11 @@ function RoundPlayInner() {
 
   if (error || !round) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.container}>
-          <Text style={styles.error}>Error: {error ?? 'Round not found'}</Text>
-          <Pressable onPress={() => router.replace('/rounds')} style={styles.topBtn}>
-            <Text style={styles.topBtnText}>Back to rounds</Text>
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <View style={[styles.center, { padding: space[4], gap: space[3] }]}>
+          <Text style={styles.errorText}>Error: {error ?? 'Round not found'}</Text>
+          <Pressable onPress={() => router.replace('/rounds')} style={styles.outlineBtn}>
+            <Text style={styles.outlineBtnText}>Back to rounds</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -140,200 +137,368 @@ function RoundPlayInner() {
 
   const isAbandoned = round.abandonedAt != null;
   const holesPlayed = computedSummary?.rows.filter((r) => r.strokes != null).length ?? 0;
-  const maxHoles = maxGlobal;
-  const canComplete = holesPlayed === maxHoles && maxHoles > 0;
+  const canComplete = holesPlayed === maxGlobal && maxGlobal > 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.frame}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      {/* ── Fixed top area ── */}
+      <View style={styles.topArea}>
+        {/* Top bar */}
         <View style={styles.topBar}>
           <Pressable onPress={() => router.replace('/rounds')} style={styles.topBtn} hitSlop={10}>
-            <Text style={styles.topBtnText}>Rounds</Text>
+            <Text style={styles.topBtnText}>← Rounds</Text>
           </Pressable>
 
           <View style={styles.topBarCenter}>
-            <Text style={styles.topBarTitle}>{mode === 'score' ? `Hole ${holeNumberGlobal}` : 'Summary'}</Text>
-            <Text style={styles.topBarSub}>
-              {round.date}
-              {round.tee ? ` · ${round.tee.name}` : ''}
+            <Text style={styles.topBarTitle} numberOfLines={1}>
+              {mode === 'score' ? `Hole ${holeNumberGlobal} of ${maxGlobal}` : 'Summary'}
             </Text>
+            {round.tee ? (
+              <Text style={styles.topBarSub}>{round.tee.name} tees</Text>
+            ) : null}
           </View>
 
           <Pressable
             onPress={() => setMode((m) => (m === 'score' ? 'summary' : 'score'))}
-            style={styles.topBtn}
+            style={[styles.topBtn, mode === 'summary' && styles.topBtnActive]}
             hitSlop={10}
           >
-            <Text style={styles.topBtnText}>{mode === 'score' ? 'Summary' : 'Score'}</Text>
+            <Text style={[styles.topBtnText, mode === 'summary' && styles.topBtnTextActive]}>
+              {mode === 'score' ? 'Summary' : 'Score'}
+            </Text>
           </Pressable>
         </View>
 
+        {/* Hole strip (score mode only) */}
         {mode === 'score' ? (
-          <ScrollView contentContainerStyle={styles.scroll}>
-            <ScrollView
-              ref={(r) => {
-                holeStripRef.current = r;
-              }}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.holeStrip}
-            >
-              {Array.from({ length: maxGlobal }, (_, i) => i + 1).map((h) => {
-                const on = h === holeNumberGlobal;
-                return (
-                  <Pressable
-                    key={h}
-                    onPress={() => setHoleNumberGlobal(h)}
-                    style={[styles.holeChip, on && styles.holeChipOn]}
-                    hitSlop={6}
-                  >
-                    <Text style={[styles.holeChipText, on && styles.holeChipTextOn]}>{h}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {resolved ? (
-              <>
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaText}>
-                    Yards: {yardageByCourseHoleId.get(resolved.courseHole.id) ?? resolved.courseHole.yards ?? '—'}
+          <ScrollView
+            ref={(r) => { holeStripRef.current = r; }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.holeStrip}
+          >
+            {Array.from({ length: maxGlobal }, (_, i) => i + 1).map((h) => {
+              const sc = scoreByGlobal.get(h);
+              const col = sc ? scoreColors(sc.strokes, sc.par) : null;
+              const isActive = h === holeNumberGlobal;
+              return (
+                <Pressable
+                  key={h}
+                  onPress={() => setHoleNumberGlobal(h)}
+                  hitSlop={6}
+                  style={[
+                    styles.holeChip,
+                    col ? { backgroundColor: col.bg, borderColor: col.border ?? col.bg } : null,
+                    isActive && styles.holeChipActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.holeChipText,
+                    col ? { color: col.text } : null,
+                    isActive && styles.holeChipTextActive,
+                  ]}>
+                    {h}
                   </Text>
-                  <Text style={styles.metaText}>HCP: {resolved.courseHole.handicap ?? '—'}</Text>
-                </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+      </View>
 
+      {/* ── Scrollable content ── */}
+      {mode === 'score' ? (
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 80 }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          {resolved ? (
+            <>
+              {/* Hole meta card */}
+              <View style={styles.metaCard}>
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>Par</Text>
+                    <Text style={styles.metaValue}>{resolved.courseHole.par}</Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>Yards</Text>
+                    <Text style={styles.metaValue}>
+                      {yardageByCourseHoleId.get(resolved.courseHole.id) ?? resolved.courseHole.yards ?? '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaLabel}>HCP</Text>
+                    <Text style={styles.metaValue}>{resolved.courseHole.handicap ?? '—'}</Text>
+                  </View>
+                </View>
                 {resolved.courseHole.notes ? (
-                  <View style={styles.notesBox}>
-                    <Text style={styles.notesLabel}>Notes</Text>
+                  <View style={styles.notesRow}>
+                    <Text style={styles.notesLabel}>Note</Text>
                     <Text style={styles.notesText}>{resolved.courseHole.notes}</Text>
                   </View>
                 ) : null}
+              </View>
 
-                <HoleEntry
-                  par={resolved.courseHole.par}
-                  initial={
-                    resolved.existing
-                      ? {
-                          strokes: resolved.existing.strokes,
-                          putts: resolved.existing.putts,
-                          fairwayHit: resolved.existing.fairwayHit,
-                          gir: resolved.existing.gir,
-                          penalties: resolved.existing.penalties,
-                        }
-                      : undefined
-                  }
-                  onSave={onSave}
-                />
-
-                <View style={styles.nav}>
-                  <Pressable
-                    onPress={() => setHoleNumberGlobal((h) => Math.max(1, h - 1))}
-                    disabled={holeNumberGlobal <= 1}
-                    style={[styles.navBtn, holeNumberGlobal <= 1 && styles.navBtnDisabled]}
-                  >
-                    <Text style={styles.navBtnText}>Prev</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      if (holeNumberGlobal < maxGlobal) setHoleNumberGlobal((h) => h + 1);
-                      else setMode('summary');
-                    }}
-                    style={styles.navBtn}
-                  >
-                    <Text style={styles.navBtnText}>{holeNumberGlobal < maxGlobal ? 'Next' : 'Summary'}</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.error}>Unable to resolve hole.</Text>
-            )}
-          </ScrollView>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scroll}>
-            {isAbandoned ? <Text style={styles.abandoned}>Abandoned</Text> : null}
-
-            {!round.isComplete && !isAbandoned ? (
-              <Pressable
-                onPress={() => completeRound()}
-                disabled={!canComplete}
-                style={[styles.primaryButton, !canComplete && styles.primaryButtonDisabled]}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {canComplete ? 'Mark round complete' : `Complete all ${maxHoles} holes to finish`}
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {computedSummary ? (
-              <RoundSummary
-                totalScore={totalScore}
-                totalPar={computedSummary.totalPar}
-                avgPutts={computedSummary.avgPutts}
-                girPct={computedSummary.girPct}
-                fairwayPct={computedSummary.fairwayPct}
-                totalPenalties={computedSummary.totalPenalties}
-                differential={round.handicapDifferential ?? null}
-                scoreRows={computedSummary.rows}
-                onEditHole={(h) => {
-                  setHoleNumberGlobal(h);
-                  setMode('score');
-                }}
+              <HoleEntry
+                par={resolved.courseHole.par}
+                initial={resolved.existing ? {
+                  strokes: resolved.existing.strokes,
+                  putts: resolved.existing.putts,
+                  fairwayHit: resolved.existing.fairwayHit,
+                  gir: resolved.existing.gir,
+                  penalties: resolved.existing.penalties,
+                } : undefined}
+                onSave={onSave}
               />
-            ) : (
-              <Text style={styles.error}>Unable to compute summary.</Text>
-            )}
+            </>
+          ) : (
+            <Text style={styles.errorText}>Unable to resolve hole.</Text>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[8] }]}
+        >
+          {isAbandoned ? (
+            <View style={styles.abandonedBanner}>
+              <Text style={styles.abandonedText}>This round was abandoned</Text>
+            </View>
+          ) : null}
 
-            {!round.isComplete && !isAbandoned ? (
-              <Pressable
-                onPress={() => {
-                  Alert.alert('Abandon round?', 'This keeps the round for reference, but hides Resume.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Abandon', style: 'destructive', onPress: () => abandonRound() },
-                  ]);
-                }}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Abandon round</Text>
-              </Pressable>
-            ) : null}
-          </ScrollView>
-        )}
-      </View>
+          {!round.isComplete && !isAbandoned ? (
+            <Pressable
+              onPress={() => completeRound()}
+              disabled={!canComplete}
+              style={[styles.primaryBtn, !canComplete && styles.primaryBtnDisabled]}
+            >
+              <Text style={styles.primaryBtnText}>
+                {canComplete ? 'Mark round complete' : `Score all ${maxGlobal} holes to finish`}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {computedSummary ? (
+            <RoundSummary
+              totalScore={totalScore}
+              totalPar={computedSummary.totalPar}
+              avgPutts={computedSummary.avgPutts}
+              girPct={computedSummary.girPct}
+              fairwayPct={computedSummary.fairwayPct}
+              totalPenalties={computedSummary.totalPenalties}
+              differential={round.handicapDifferential ?? null}
+              scoreRows={computedSummary.rows}
+              onEditHole={(h) => { setHoleNumberGlobal(h); setMode('score'); }}
+            />
+          ) : (
+            <Text style={styles.errorText}>Unable to compute summary.</Text>
+          )}
+
+          {!round.isComplete && !isAbandoned ? (
+            <Pressable
+              onPress={() => {
+                Alert.alert('Abandon round?', 'Keeps the round for reference but removes it from Resume.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Abandon', style: 'destructive', onPress: () => abandonRound() },
+                ]);
+              }}
+              style={styles.abandonBtn}
+            >
+              <Text style={styles.abandonBtnText}>Abandon round</Text>
+            </Pressable>
+          ) : null}
+        </ScrollView>
+      )}
+
+      {/* ── Fixed bottom nav (score mode) ── */}
+      {mode === 'score' ? (
+        <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+          <Pressable
+            onPress={() => setHoleNumberGlobal((h) => Math.max(1, h - 1))}
+            disabled={holeNumberGlobal <= 1}
+            style={[styles.navBtn, holeNumberGlobal <= 1 && styles.navBtnDisabled]}
+          >
+            <Text style={styles.navBtnText}>← Prev</Text>
+          </Pressable>
+          <Text style={styles.navCenter}>{holeNumberGlobal} / {maxGlobal}</Text>
+          <Pressable
+            onPress={() => {
+              if (holeNumberGlobal < maxGlobal) setHoleNumberGlobal((h) => h + 1);
+              else setMode('summary');
+            }}
+            style={styles.navBtn}
+          >
+            <Text style={styles.navBtnText}>
+              {holeNumberGlobal < maxGlobal ? 'Next →' : 'Summary →'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  frame: { flex: 1 },
-  container: { padding: 16, gap: 12 },
-  scroll: { padding: 16, gap: 12, paddingBottom: 40 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 16, paddingBottom: 10 },
-  topBtn: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#999' },
-  topBtnText: { fontSize: 14, fontWeight: '900' },
-  topBarCenter: { flex: 1, alignItems: 'center' },
-  topBarTitle: { fontSize: 18, fontWeight: '900' },
-  topBarSub: { opacity: 0.75, fontWeight: '600' },
-  holeStrip: { gap: 8, paddingVertical: 6 },
-  holeChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: '#999', alignItems: 'center', justifyContent: 'center' },
-  holeChipOn: { backgroundColor: '#2f80ed', borderColor: '#2f80ed' },
-  holeChipText: { fontSize: 15, fontWeight: '900' },
-  holeChipTextOn: { color: '#fff' },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  metaText: { fontWeight: '700', opacity: 0.8 },
-  notesBox: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, gap: 6 },
-  notesLabel: { fontSize: 12, fontWeight: '900', opacity: 0.7 },
-  notesText: { fontSize: 14, fontWeight: '600', opacity: 0.85 },
-  nav: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  navBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#999', alignItems: 'center' },
-  navBtnDisabled: { opacity: 0.5 },
-  navBtnText: { fontSize: 16, fontWeight: '700' },
-  primaryButton: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#2f80ed', alignItems: 'center' },
-  primaryButtonDisabled: { opacity: 0.5 },
-  primaryButtonText: { color: 'white', fontSize: 16, fontWeight: '800' },
-  secondaryButton: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#2f80ed', alignItems: 'center' },
-  secondaryButtonText: { color: '#2f80ed', fontSize: 16, fontWeight: '800' },
-  abandoned: { fontSize: 14, fontWeight: '900', color: '#c62828' },
-  error: { color: '#c62828', fontWeight: '700' },
-});
+  screen: { flex: 1, backgroundColor: colors.surface },
+  flex: { flex: 1 },
+  center: { padding: space[4], gap: space[3], justifyContent: 'center' },
 
+  // ── Fixed top area ──
+  topArea: {
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    paddingTop: space[3],
+    paddingBottom: space[2],
+    gap: space[2],
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space[4],
+    gap: space[2],
+  },
+  topBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  topBtnActive: {
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primary,
+  },
+  topBtnText: { ...typography.labelM, color: colors.text },
+  topBtnTextActive: { color: colors.onPrimaryContainer, fontWeight: '700' },
+  topBarCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  topBarTitle: { ...typography.headingM, color: colors.text },
+  topBarSub: { ...typography.labelS, color: colors.textMuted },
+
+  // ── Hole strip ──
+  holeStrip: {
+    flexDirection: 'row',
+    gap: space[2],
+    paddingHorizontal: space[4],
+    paddingVertical: space[1],
+  },
+  holeChip: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  holeChipActive: {
+    borderWidth: 2,
+    borderColor: colors.text,
+  },
+  holeChipText: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
+  holeChipTextActive: { fontWeight: '700' },
+
+  // ── Scrollable content ──
+  scroll: { padding: space[4], gap: space[4], paddingBottom: 40 },
+
+  metaCard: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[4],
+    gap: space[3],
+  },
+  metaRow: { flexDirection: 'row', alignItems: 'center' },
+  metaItem: { flex: 1, alignItems: 'center', gap: space[1] },
+  metaDivider: { width: StyleSheet.hairlineWidth, height: 36, backgroundColor: colors.outlineVariant },
+  metaLabel: { ...typography.labelS, color: colors.textMuted },
+  metaValue: { fontSize: 20, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+  notesRow: {
+    flexDirection: 'row',
+    gap: space[2],
+    alignItems: 'flex-start',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.outlineVariant,
+    paddingTop: space[3],
+  },
+  notesLabel: { ...typography.labelS, color: colors.textMuted, paddingTop: 2 },
+  notesText: { ...typography.bodyS, color: colors.text, flex: 1 },
+
+  // ── Summary mode ──
+  abandonedBanner: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: space[3],
+    alignItems: 'center',
+  },
+  abandonedText: { ...typography.labelM, color: colors.error, fontWeight: '600' },
+
+  primaryBtn: {
+    height: 52,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnDisabled: { opacity: 0.45 },
+  primaryBtnText: { ...typography.labelM, color: colors.onPrimary, fontWeight: '700', fontSize: 16 },
+
+  abandonBtn: {
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  abandonBtnText: { ...typography.labelM, color: colors.error },
+
+  // ── Bottom nav ──
+  bottomNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space[4],
+    paddingTop: space[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceBright,
+    gap: space[3],
+  },
+  navBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceBright,
+  },
+  navBtnDisabled: { opacity: 0.35 },
+  navBtnText: { ...typography.labelM, color: colors.text },
+  navCenter: { ...typography.labelS, color: colors.textMuted, minWidth: 48, textAlign: 'center' },
+
+  // ── Misc ──
+  muted: { ...typography.bodyS, color: colors.textMuted },
+  errorText: { ...typography.bodyS, color: colors.error },
+  outlineBtn: {
+    height: 44,
+    paddingHorizontal: space[4],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outlineBtnText: { ...typography.labelM, color: colors.text },
+});
