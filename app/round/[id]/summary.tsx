@@ -111,7 +111,7 @@ export default function RoundSummaryScreen() {
         totalPenalties={computed.totalPenalties}
         differential={round.handicapDifferential ?? null}
         scoreRows={computed.rows}
-        onEditHole={(h) => router.replace(`/round/${round.id}/hole/${h}`)}
+        onEditHole={(h) => router.replace(`/round/${round.id}/play?hole=${h}`)}
       />
 
       <View style={styles.actionsRow}>

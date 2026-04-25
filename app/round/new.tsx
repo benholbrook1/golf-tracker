@@ -107,7 +107,7 @@ export default function NewRoundScreen() {
           { roundId: round.id, nineId: selection.backNineId, nineOrder: 2 },
         ]);
 
-        router.replace(`/round/${round.id}/hole/1`);
+        router.replace(`/round/${round.id}/play?hole=1`);
       } else {
         const inserted = await db
           .insert(rounds)
@@ -123,7 +123,7 @@ export default function NewRoundScreen() {
         const round = inserted[0]!;
         await db.insert(roundNines).values([{ roundId: round.id, nineId: selection.nineId, nineOrder: 1 }]);
 
-        router.replace(`/round/${round.id}/hole/1`);
+        router.replace(`/round/${round.id}/play?hole=1`);
       }
     } catch (e) {
       Alert.alert('Failed to create round', e instanceof Error ? e.message : String(e));

@@ -95,9 +95,9 @@ export default function RoundsTab() {
     try {
       const t = await getResumeTarget(roundId);
       if (t.type === 'hole') {
-        router.push(`/round/${roundId}/hole/${t.globalHole}`);
+        router.push(`/round/${roundId}/play?hole=${t.globalHole}`);
       } else {
-        router.push(`/round/${roundId}/summary`);
+        router.push(`/round/${roundId}/play?tab=summary`);
       }
     } finally {
       setResuming(null);

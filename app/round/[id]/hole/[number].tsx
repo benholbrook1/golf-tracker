@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { HoleEntry } from '@/components/HoleEntry';
@@ -10,7 +11,7 @@ import type { HoleScoreInput } from '@/utils/validators';
 export default function HoleScreen() {
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, animation: 'none' }} />
       <HoleScreenInner />
     </>
   );
@@ -84,92 +85,123 @@ function HoleScreenInner() {
   const next = holeNumberGlobal + 1;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Hole {holeNumberGlobal}</Text>
-      <Text style={styles.subtitle}>
-        {round.date}
-        {round.tee ? ` · ${round.tee.name}` : ''}
-      </Text>
-
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>
-          Yards:{' '}
-          {yardageByCourseHoleId.get(resolved.courseHole.id) ??
-            resolved.courseHole.yards ??
-            '—'}
-        </Text>
-        <Text style={styles.metaText}>HCP: {resolved.courseHole.handicap ?? '—'}</Text>
-      </View>
-      {resolved.courseHole.notes ? (
-        <View style={styles.notesBox}>
-          <Text style={styles.notesLabel}>Notes</Text>
-          <Text style={styles.notesText}>{resolved.courseHole.notes}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.replace('/rounds')} style={styles.topBtn} hitSlop={10}>
+            <Text style={styles.topBtnText}>Rounds</Text>
+          </Pressable>
+          <View style={styles.topBarCenter}>
+            <Text style={styles.topBarTitle}>Hole {holeNumberGlobal}</Text>
+            <Text style={styles.topBarSub}>
+              {round.date}
+              {round.tee ? ` · ${round.tee.name}` : ''}
+            </Text>
+          </View>
+          <Pressable onPress={() => router.replace(`/round/${roundId}/summary`)} style={styles.topBtn} hitSlop={10}>
+            <Text style={styles.topBtnText}>Summary</Text>
+          </Pressable>
         </View>
-      ) : null}
 
-      <HoleEntry
-        par={resolved.courseHole.par}
-        initial={
-          resolved.existing
-            ? {
-                strokes: resolved.existing.strokes,
-                putts: resolved.existing.putts,
-                fairwayHit: resolved.existing.fairwayHit,
-                gir: resolved.existing.gir,
-                penalties: resolved.existing.penalties,
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.holeStrip}>
+          {Array.from({ length: resolved.maxGlobal }, (_, i) => i + 1).map((h) => {
+            const on = h === holeNumberGlobal;
+            return (
+              <Pressable
+                key={h}
+                onPress={() => router.replace(`/round/${roundId}/hole/${h}`)}
+                style={[styles.holeChip, on && styles.holeChipOn]}
+                hitSlop={6}
+              >
+                <Text style={[styles.holeChipText, on && styles.holeChipTextOn]}>{h}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>
+            Yards:{' '}
+            {yardageByCourseHoleId.get(resolved.courseHole.id) ?? resolved.courseHole.yards ?? '—'}
+          </Text>
+          <Text style={styles.metaText}>HCP: {resolved.courseHole.handicap ?? '—'}</Text>
+        </View>
+        {resolved.courseHole.notes ? (
+          <View style={styles.notesBox}>
+            <Text style={styles.notesLabel}>Notes</Text>
+            <Text style={styles.notesText}>{resolved.courseHole.notes}</Text>
+          </View>
+        ) : null}
+
+        <HoleEntry
+          par={resolved.courseHole.par}
+          initial={
+            resolved.existing
+              ? {
+                  strokes: resolved.existing.strokes,
+                  putts: resolved.existing.putts,
+                  fairwayHit: resolved.existing.fairwayHit,
+                  gir: resolved.existing.gir,
+                  penalties: resolved.existing.penalties,
+                }
+              : undefined
+          }
+          onSave={onSave}
+        />
+
+        <View style={styles.nav}>
+          <Pressable
+            onPress={() => {
+              if (prev < 1) return;
+              router.replace(`/round/${roundId}/hole/${prev}`);
+            }}
+            disabled={prev < 1}
+            style={[styles.navBtn, prev < 1 && styles.navBtnDisabled]}
+          >
+            <Text style={styles.navBtnText}>Prev</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              if (next <= resolved.maxGlobal) {
+                router.replace(`/round/${roundId}/hole/${next}`);
+              } else {
+                router.replace(`/round/${roundId}/summary`);
               }
-            : undefined
-        }
-        onSave={onSave}
-      />
-
-      <View style={styles.nav}>
-        <Pressable
-          onPress={() => {
-            if (prev < 1) return;
-            router.replace(`/round/${roundId}/hole/${prev}`);
-          }}
-          disabled={prev < 1}
-          style={[styles.navBtn, prev < 1 && styles.navBtnDisabled]}
-        >
-          <Text style={styles.navBtnText}>Prev</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => {
-            if (next <= resolved.maxGlobal) {
-              router.replace(`/round/${roundId}/hole/${next}`);
-            } else {
-              router.replace(`/round/${roundId}/summary`);
-            }
-          }}
-          style={styles.navBtn}
-          onLongPress={() => {
-            Alert.alert('Jump', 'Go to summary?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Summary', onPress: () => router.replace(`/round/${roundId}/summary`) },
-            ]);
-          }}
-        >
-          <Text style={styles.navBtnText}>{next <= resolved.maxGlobal ? 'Next' : 'Summary'}</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+            }}
+            style={styles.navBtn}
+            onLongPress={() => {
+              Alert.alert('Jump', 'Go to summary?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Summary', onPress: () => router.replace(`/round/${roundId}/summary`) },
+              ]);
+            }}
+          >
+            <Text style={styles.navBtnText}>{next <= resolved.maxGlobal ? 'Next' : 'Summary'}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1 },
   container: {
     padding: 16,
     gap: 12,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  subtitle: {
-    opacity: 0.8,
-  },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  topBtn: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#999' },
+  topBtnText: { fontSize: 14, fontWeight: '900' },
+  topBarCenter: { flex: 1, alignItems: 'center' },
+  topBarTitle: { fontSize: 18, fontWeight: '900' },
+  topBarSub: { opacity: 0.75, fontWeight: '600' },
+  holeStrip: { gap: 8, paddingVertical: 6 },
+  holeChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: '#999', alignItems: 'center', justifyContent: 'center' },
+  holeChipOn: { backgroundColor: '#2f80ed', borderColor: '#2f80ed' },
+  holeChipText: { fontSize: 15, fontWeight: '900' },
+  holeChipTextOn: { color: '#fff' },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   metaText: { fontWeight: '700', opacity: 0.8 },
   notesBox: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, gap: 6 },
