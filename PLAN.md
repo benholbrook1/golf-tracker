@@ -686,8 +686,9 @@ Run with: open `app/seed.tsx` in the simulator and tap **Run seed** (recommended
 
 - [ ] Configure EAS Build (`eas.json`) — required for SQLite in production
 - [ ] Move any LLM provider secrets to a server-side proxy (Supabase Edge Function is fine) — do not ship long-lived API keys in the app bundle
-- [ ] Add error boundaries on all DB operations — catch disk-full and constraint errors
-- [ ] Add loading and empty states to all list screens
+- [x] Root `app/_layout.tsx` exports a custom `ErrorBoundary` (Expo Router) with retry — not per-DB-call, but catches render errors
+- [x] Loading/empty states improved on Home, Courses, Rounds, Stats, New round (not yet “every” screen)
+- [ ] Add error boundaries on all DB operations — catch disk-full and constraint errors (deferred: use try/catch in hooks)
 - [ ] Verify `deletedAt` filter present on every query in hooks
 - [ ] Verify `withTimestamp()` called on every `db.update()`
 - [ ] **Gate**: install via TestFlight on a fresh device, complete a round, reinstall app, verify data persists
@@ -724,4 +725,4 @@ These are explicitly deferred. Do not implement during MVP phases.
 
 ---
 
-*Last updated: 2026-04-24 — Phase 1–2 implemented; Phase 3 stats + scanner: multi-tee parse (`tees` + `yardages[]`), user picks tee + course name on review, `confirmScorecardParse` stores selected set as `course_holes.yards`; optional proxy or local `.env` Gemini; remaining work is real-world scan tuning + hardening if distributing beyond a personal device.*
+*Last updated: 2026-04-24 — Phase 1–3 as before. **UX refinements:** Home hub; **Courses** tab (list, edit name + combo rating/slope, delete if no rounds); `useCourses` / `useCourseDetail` **refresh**; New round **date** + preselect `courseId` from scan/manual; Rounds **Resume** → `getResumeTarget()`; round summary **New round at this course** + **View stats**; About **modal**; dev **seed** only in `__DEV__`; 9/18/27 **global hole** resolution on hole/summary/stats (offset `(nineOrder-1)*9`).*

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Link } from 'expo-router';
 
 import { HandicapBadge } from '@/components/HandicapBadge';
 import { Text } from '@/components/Themed';
@@ -75,6 +76,20 @@ export default function TabTwoScreen() {
       </View>
 
       {error ? <Text style={styles.error}>Error: {error}</Text> : null}
+
+      {!loading && stats && stats.roundsAnalyzed === 0 ? (
+        <View style={styles.emptyCta}>
+          <Text style={styles.emptyCtaText}>
+            Finish at least one complete round to unlock trends. For a handicap index (est.), you need several completed 18-hole
+            rounds with a rated layout.
+          </Text>
+          <Link href="/round/new" asChild>
+            <Pressable style={styles.emptyCtaBtn}>
+              <Text style={styles.emptyCtaBtnText}>Start a round</Text>
+            </Pressable>
+          </Link>
+        </View>
+      ) : null}
 
       <HandicapBadge />
 
@@ -206,6 +221,10 @@ const styles = StyleSheet.create({
     color: '#c62828',
     fontWeight: '700',
   },
+  emptyCta: { padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#2f80ed', gap: 10 },
+  emptyCtaText: { fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: 0.9 },
+  emptyCtaBtn: { alignSelf: 'flex-start', backgroundColor: '#2f80ed', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
+  emptyCtaBtnText: { color: 'white', fontWeight: '800' },
 });
 
 const cardStyles = StyleSheet.create({

@@ -54,8 +54,8 @@ export default function ManualCourseScreen() {
     }
     setBusy(true);
     try {
-      await confirmScorecardParse(buildDefault18(n), { selectedTeeIndex: 0 });
-      router.replace('/round/new');
+      const { courseId } = await confirmScorecardParse(buildDefault18(n), { selectedTeeIndex: 0 });
+      router.replace({ pathname: '/round/new', params: { courseId } });
     } catch (e) {
       Alert.alert('Create failed', e instanceof Error ? e.message : String(e));
     } finally {

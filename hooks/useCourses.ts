@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { db } from '@/db/client';
 import { courseCombos, courseHoles, courseNines, courses } from '@/db/schema';
@@ -10,12 +10,22 @@ type Loadable<T> = {
   data: T;
 };
 
-export function useCourses(): { courses: typeof courses.$inferSelect[]; loading: boolean; error: string | null } {
+export function useCourses(): {
+  courses: typeof courses.$inferSelect[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+} {
   const [state, setState] = useState<Loadable<typeof courses.$inferSelect[]>>({
     loading: true,
     error: null,
     data: [],
   });
+  const [tick, setTick] = useState(0);
+
+  const refresh = useCallback(() => {
+    setTick((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,9 +47,9 @@ export function useCourses(): { courses: typeof courses.$inferSelect[]; loading:
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tick]);
 
-  return { courses: state.data, loading: state.loading, error: state.error };
+  return { courses: state.data, loading: state.loading, error: state.error, refresh };
 }
 
 export type CourseDetail = {
@@ -48,12 +58,18 @@ export type CourseDetail = {
   combos: typeof courseCombos.$inferSelect[];
 };
 
-export function useCourseDetail(courseId: string | null | undefined): Loadable<CourseDetail | null> {
+export function useCourseDetail(
+  courseId: string | null | undefined
+): Loadable<CourseDetail | null> & { refresh: () => void } {
   const [state, setState] = useState<Loadable<CourseDetail | null>>({
     data: null,
     loading: true,
     error: null,
   });
+  const [tick, setTick] = useState(0);
+  const refresh = useCallback(() => {
+    setTick((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     if (!courseId) {
@@ -111,8 +127,8 @@ export function useCourseDetail(courseId: string | null | undefined): Loadable<C
     return () => {
       cancelled = true;
     };
-  }, [courseId]);
+  }, [courseId, tick]);
 
-  return state;
+  return { ...state, refresh };
 }
 

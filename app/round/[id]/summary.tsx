@@ -19,7 +19,7 @@ export default function RoundSummaryScreen() {
     const rows: Array<{ globalHole: number; par: number; strokes: number | null }> = [];
 
     for (const rn of roundNines) {
-      const offset = rn.nineOrder === 2 ? 9 : 0;
+      const offset = (rn.nineOrder - 1) * 9;
       for (const ch of rn.courseHoles) {
         const existing = rn.holes.find((h) => h.holeNumber === ch.holeNumber) ?? null;
         rows.push({
@@ -81,7 +81,7 @@ export default function RoundSummaryScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Round Summary</Text>
+      <Text style={styles.title}>Round summary</Text>
       <Text style={styles.subtitle}>{round.date}</Text>
 
       {!round.isComplete ? (
@@ -96,25 +96,6 @@ export default function RoundSummaryScreen() {
         </Pressable>
       ) : null}
 
-      <Pressable
-        onPress={() => {
-          Alert.alert('Delete round?', 'This will remove the round from the app (soft delete).', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: async () => {
-                await deleteRound();
-                router.replace('/(tabs)/rounds');
-              },
-            },
-          ]);
-        }}
-        style={styles.dangerButton}
-      >
-        <Text style={styles.dangerButtonText}>Delete round</Text>
-      </Pressable>
-
       <RoundSummary
         totalScore={totalScore}
         totalPar={computed.totalPar}
@@ -125,6 +106,37 @@ export default function RoundSummaryScreen() {
         scoreRows={computed.rows}
         onEditHole={(h) => router.replace(`/round/${round.id}/hole/${h}`)}
       />
+
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={() => router.push({ pathname: '/round/new', params: { courseId: round.courseId } })}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>New round at this course</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/two')} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>View stats</Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        onPress={() => {
+          Alert.alert('Delete round?', 'This will remove the round from the app (soft delete).', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                await deleteRound();
+                router.replace('/rounds');
+              },
+            },
+          ]);
+        }}
+        style={styles.dangerButton}
+      >
+        <Text style={styles.dangerButtonText}>Delete round</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -156,6 +168,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  actionsRow: { gap: 8, marginTop: 4 },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2f80ed',
+    alignItems: 'center',
+  },
+  secondaryButtonText: { color: '#2f80ed', fontSize: 16, fontWeight: '800' },
   dangerButton: {
     paddingVertical: 12,
     paddingHorizontal: 14,

@@ -26,9 +26,10 @@ function HoleScreenInner() {
     if (!Number.isFinite(holeNumberGlobal) || holeNumberGlobal < 1) return null;
     if (!round || roundNines.length === 0) return null;
 
-    const isBack = holeNumberGlobal > 9;
-    const nineOrder = isBack ? 2 : 1;
-    const holeNumberWithinNine = isBack ? holeNumberGlobal - 9 : holeNumberGlobal;
+    const maxGlobal = roundNines.length * 9;
+    if (holeNumberGlobal > maxGlobal) return null;
+    const nineOrder = Math.ceil(holeNumberGlobal / 9);
+    const holeNumberWithinNine = ((holeNumberGlobal - 1) % 9) + 1;
 
     const rn = roundNines.find((n) => n.nineOrder === nineOrder);
     if (!rn) return null;
@@ -37,8 +38,6 @@ function HoleScreenInner() {
     if (!courseHole) return null;
 
     const existing = rn.holes.find((hs) => hs.holeNumber === holeNumberWithinNine) ?? null;
-
-    const maxGlobal = roundNines.length >= 2 ? 18 : 9;
 
     return {
       rn,

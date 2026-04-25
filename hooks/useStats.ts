@@ -139,7 +139,7 @@ export function useStats(): {
 
       const byGlobalHole = new Map<number, { sum: number; n: number }>();
       for (const h of trendRows) {
-        const globalHole = h.nineOrder === 2 ? 9 + h.holeNumberWithinNine : h.holeNumberWithinNine;
+        const globalHole = (h.nineOrder - 1) * 9 + h.holeNumberWithinNine;
         const cur = byGlobalHole.get(globalHole) ?? { sum: 0, n: 0 };
         cur.sum += h.putts;
         cur.n += 1;

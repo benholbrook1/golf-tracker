@@ -140,8 +140,10 @@ export default function CourseScanScreen() {
         return;
       }
 
-      await confirmScorecardParse(checked.data, { selectedTeeIndex });
-      Alert.alert('Saved', 'Course created from scorecard.', [{ text: 'OK', onPress: () => router.replace('/round/new') }]);
+      const { courseId } = await confirmScorecardParse(checked.data, { selectedTeeIndex });
+      Alert.alert('Saved', 'Course created from scorecard.', [
+        { text: 'OK', onPress: () => router.replace({ pathname: '/round/new', params: { courseId } }) },
+      ]);
     } catch (e) {
       Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
     } finally {
