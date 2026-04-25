@@ -141,11 +141,7 @@ export const courseCombos = sqliteTable(
     courseIdIdx: index('course_combos_course_id_idx').on(t.courseId),
     frontNineIdIdx: index('course_combos_front_nine_id_idx').on(t.frontNineId),
     backNineIdIdx: index('course_combos_back_nine_id_idx').on(t.backNineId),
-    courseFrontBackUnique: uniqueIndex('course_combos_course_id_front_back_uq').on(
-      t.courseId,
-      t.frontNineId,
-      t.backNineId
-    ),
+    courseIdNameUnique: uniqueIndex('course_combos_course_id_name_uq').on(t.courseId, t.name),
   })
 );
 

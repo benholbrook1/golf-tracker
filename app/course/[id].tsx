@@ -404,20 +404,13 @@ export default function CourseDetailScreen() {
     }
     setSaving(true);
     try {
-      const existingSame = await db
-        .select({ id: courseCombos.id, name: courseCombos.name })
+      const nameConflict = await db
+        .select({ id: courseCombos.id })
         .from(courseCombos)
-        .where(
-          and(
-            eq(courseCombos.courseId, data.course.id),
-            isNull(courseCombos.deletedAt),
-            eq(courseCombos.frontNineId, newFrontId),
-            eq(courseCombos.backNineId, newBackId)
-          )
-        )
+        .where(and(eq(courseCombos.courseId, data.course.id), isNull(courseCombos.deletedAt), eq(courseCombos.name, nm)))
         .limit(1);
-      if (existingSame[0]) {
-        Alert.alert('Already exists', `That configuration already exists as “${existingSame[0].name}”.`);
+      if (nameConflict[0]) {
+        Alert.alert('Name already used', 'Pick a different configuration name for this course.');
         return;
       }
 
@@ -437,30 +430,7 @@ export default function CourseDetailScreen() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('constraint')) {
-        const existingEither = await db
-          .select({
-            id: courseCombos.id,
-            name: courseCombos.name,
-            frontNineId: courseCombos.frontNineId,
-            backNineId: courseCombos.backNineId,
-          })
-          .from(courseCombos)
-          .where(and(eq(courseCombos.courseId, data.course.id), isNull(courseCombos.deletedAt)));
-
-        const exact = existingEither.find((c) => c.frontNineId === newFrontId && c.backNineId === newBackId);
-        const reverse = existingEither.find((c) => c.frontNineId === newBackId && c.backNineId === newFrontId);
-        if (exact) {
-          Alert.alert('Already exists', `That exact front/back pair already exists as “${exact.name}”.`);
-          return;
-        }
-        if (reverse) {
-          Alert.alert(
-            'Blocked by uniqueness',
-            `The reverse order already exists as “${reverse.name}”.\n\nIf you still want both directions saved, we’ll need to change the uniqueness rule.`
-          );
-          return;
-        }
-        Alert.alert('Already exists', 'A configuration with this front and back nine is already saved.');
+        Alert.alert('Could not add', 'This configuration violates a uniqueness constraint (likely duplicate name).');
         return;
       }
       Alert.alert('Could not add', msg);
@@ -601,6 +571,10 @@ export default function CourseDetailScreen() {
     );
   }
 
+  const orderedPairsTotal = data.nines.length >= 2 ? data.nines.length * (data.nines.length - 1) : 0;
+  const existingPairs = new Set(data.combos.map((c) => `${c.frontNineId}::${c.backNineId}`));
+  const allPairsCreated = orderedPairsTotal > 0 && existingPairs.size >= orderedPairsTotal;
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Edit course</Text>
@@ -733,8 +707,13 @@ export default function CourseDetailScreen() {
           rating: String(c.rating),
           slope: String(c.slope),
         };
+        const frontName = nineNameById[c.frontNineId] ?? data.nines.find((n) => n.id === c.frontNineId)?.name ?? '—';
+        const backName = nineNameById[c.backNineId] ?? data.nines.find((n) => n.id === c.backNineId)?.name ?? '—';
         return (
           <View key={c.id} style={styles.comboCard}>
+            <Text style={styles.comboMeta}>
+              Front: {frontName} • Back: {backName}
+            </Text>
             <View style={styles.comboHead}>
               <Text style={styles.comboLabel}>Name</Text>
               <TextInput
@@ -770,7 +749,7 @@ export default function CourseDetailScreen() {
         );
       })}
 
-      {data.nines.length >= 2 ? (
+      {!allPairsCreated && data.nines.length >= 2 ? (
         <View style={styles.addCombo}>
           <Text style={styles.label}>Add configuration</Text>
             <View style={styles.pickerBlock}>
@@ -835,6 +814,8 @@ export default function CourseDetailScreen() {
             <Text style={styles.secondaryText}>Add configuration</Text>
           </Pressable>
         </View>
+      ) : allPairsCreated ? (
+        <Text style={styles.muted}>All possible front/back nine configurations are already saved.</Text>
       ) : null}
 
       <Pressable onPress={onSave} disabled={saving} style={[styles.primary, saving && styles.disabled]}>
@@ -875,6 +856,7 @@ const styles = StyleSheet.create({
   comboCard: { borderWidth: 1, borderColor: '#ccc', borderRadius: 12, padding: 12, gap: 8, marginTop: 4 },
   comboHead: { gap: 6 },
   comboLabel: { fontSize: 12, fontWeight: '800', opacity: 0.7 },
+  comboMeta: { fontSize: 13, fontWeight: '700', opacity: 0.65 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   mini: { fontSize: 12, fontWeight: '700', opacity: 0.7 },
   inputSmall: {
