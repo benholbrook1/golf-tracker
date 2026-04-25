@@ -11,7 +11,8 @@ export default function RoundSummaryScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const roundId = params.id ?? null;
 
-  const { round, roundNines, totalScore, loading, error, completeRound, deleteRound, refresh } = useRound(roundId);
+  const { round, roundNines, totalScore, loading, error, completeRound, abandonRound, deleteRound, refresh } =
+    useRound(roundId);
 
   const computed = useMemo(() => {
     if (!round || roundNines.length === 0) return null;
@@ -42,7 +43,10 @@ export default function RoundSummaryScreen() {
     const fairways: number[] = roundNines.flatMap((rn) => rn.holes.map((h) => (h.fairwayHit ? 1 : 0)));
     const fairwayPct = fairways.length ? (fairways.reduce((s, v) => s + v, 0) / fairways.length) * 100 : null;
 
-    return { rows, totalPar, avgPutts, girPct, fairwayPct };
+    const penalties = roundNines.flatMap((rn) => rn.holes.map((h) => h.penalties ?? 0));
+    const totalPenalties = penalties.reduce((s, p) => s + p, 0);
+
+    return { rows, totalPar, avgPutts, girPct, fairwayPct, totalPenalties };
   }, [round, roundNines]);
 
   useEffect(() => {
@@ -78,13 +82,14 @@ export default function RoundSummaryScreen() {
   const maxHoles = isNineHole ? 9 : 18;
   const holesPlayed = computed.rows.filter((r) => r.strokes != null).length;
   const canComplete = holesPlayed === maxHoles;
+  const isAbandoned = round.abandonedAt != null;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Round summary</Text>
       <Text style={styles.subtitle}>{round.date}</Text>
 
-      {!round.isComplete ? (
+      {!round.isComplete && !isAbandoned ? (
         <Pressable
           onPress={() => completeRound()}
           disabled={!canComplete}
@@ -95,6 +100,7 @@ export default function RoundSummaryScreen() {
           </Text>
         </Pressable>
       ) : null}
+      {isAbandoned ? <Text style={styles.abandoned}>Abandoned</Text> : null}
 
       <RoundSummary
         totalScore={totalScore}
@@ -102,6 +108,7 @@ export default function RoundSummaryScreen() {
         avgPutts={computed.avgPutts}
         girPct={computed.girPct}
         fairwayPct={computed.fairwayPct}
+        totalPenalties={computed.totalPenalties}
         differential={round.handicapDifferential ?? null}
         scoreRows={computed.rows}
         onEditHole={(h) => router.replace(`/round/${round.id}/hole/${h}`)}
@@ -118,6 +125,20 @@ export default function RoundSummaryScreen() {
           <Text style={styles.secondaryButtonText}>View stats</Text>
         </Pressable>
       </View>
+
+      {!round.isComplete && !isAbandoned ? (
+        <Pressable
+          onPress={() => {
+            Alert.alert('Abandon round?', 'This keeps the round for reference, but hides Resume.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Abandon', style: 'destructive', onPress: () => abandonRound() },
+            ]);
+          }}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>Abandon round</Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         onPress={() => {
@@ -178,6 +199,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: { color: '#2f80ed', fontSize: 16, fontWeight: '800' },
+  abandoned: { fontSize: 14, fontWeight: '900', color: '#c62828' },
   dangerButton: {
     paddingVertical: 12,
     paddingHorizontal: 14,

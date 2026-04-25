@@ -1,13 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { db } from '@/db/client';
-import { courseCombos, courseHoles, courseNines, holeScores, roundNines, rounds } from '@/db/schema';
+import {
+  courseCombos,
+  courseHoleTeeYardages,
+  courseHoles,
+  courseNines,
+  courseTees,
+  holeScores,
+  roundNines,
+  rounds,
+} from '@/db/schema';
 import { HoleScoreInput, HoleScoreSchema } from '@/utils/validators';
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { softDelete, withTimestamp } from '@/utils/timestamps';
 
 type RoundBundle = {
-  round: (typeof rounds.$inferSelect & { combo: typeof courseCombos.$inferSelect | null }) | null;
+  round:
+    | (typeof rounds.$inferSelect & {
+        combo: typeof courseCombos.$inferSelect | null;
+        tee: typeof courseTees.$inferSelect | null;
+      })
+    | null;
   roundNines: Array<
     typeof roundNines.$inferSelect & {
       nine: typeof courseNines.$inferSelect;
@@ -15,12 +29,15 @@ type RoundBundle = {
       courseHoles: typeof courseHoles.$inferSelect[];
     }
   >;
+  /** courseHoleId → yards for the round’s tee */
+  yardageByCourseHoleId: Map<string, number | null>;
   totalScore: number;
 };
 
 export function useRound(roundId: string | null | undefined): {
   round: RoundBundle['round'];
   roundNines: RoundBundle['roundNines'];
+  yardageByCourseHoleId: RoundBundle['yardageByCourseHoleId'];
   totalScore: number;
   loading: boolean;
   error: string | null;
@@ -32,15 +49,21 @@ export function useRound(roundId: string | null | undefined): {
     data: HoleScoreInput
   ) => Promise<void>;
   completeRound: () => Promise<void>;
+  abandonRound: () => Promise<void>;
   deleteRound: () => Promise<void>;
 } {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bundle, setBundle] = useState<RoundBundle>({ round: null, roundNines: [], totalScore: 0 });
+  const [bundle, setBundle] = useState<RoundBundle>({
+    round: null,
+    roundNines: [],
+    yardageByCourseHoleId: new Map(),
+    totalScore: 0,
+  });
 
   const load = useCallback(async () => {
     if (!roundId) {
-      setBundle({ round: null, roundNines: [], totalScore: 0 });
+      setBundle({ round: null, roundNines: [], yardageByCourseHoleId: new Map(), totalScore: 0 });
       setLoading(false);
       setError(null);
       return;
@@ -52,11 +75,11 @@ export function useRound(roundId: string | null | undefined): {
     try {
       const round = await db.query.rounds.findFirst({
         where: and(eq(rounds.id, roundId), isNull(rounds.deletedAt)),
-        with: { combo: true },
+        with: { combo: true, tee: true },
       });
 
       if (!round) {
-        setBundle({ round: null, roundNines: [], totalScore: 0 });
+        setBundle({ round: null, roundNines: [], yardageByCourseHoleId: new Map(), totalScore: 0 });
         setError('Round not found');
         setLoading(false);
         return;
@@ -94,6 +117,27 @@ export function useRound(roundId: string | null | undefined): {
         courseHoles: (holesByNine[rn.nineId] ?? []).sort((a, b) => a.holeNumber - b.holeNumber),
       }));
 
+      const allCourseHoleIds = ordered.flatMap((rn) => rn.courseHoles.map((h) => h.id));
+      const yardageByCourseHoleId = new Map<string, number | null>();
+      if (round.teeId && allCourseHoleIds.length > 0) {
+        const yardRows = await db
+          .select({
+            courseHoleId: courseHoleTeeYardages.courseHoleId,
+            yards: courseHoleTeeYardages.yards,
+          })
+          .from(courseHoleTeeYardages)
+          .where(
+            and(
+              eq(courseHoleTeeYardages.courseTeeId, round.teeId),
+              inArray(courseHoleTeeYardages.courseHoleId, allCourseHoleIds),
+              isNull(courseHoleTeeYardages.deletedAt)
+            )
+          );
+        for (const y of yardRows) {
+          yardageByCourseHoleId.set(y.courseHoleId, y.yards);
+        }
+      }
+
       const totalScore = await db
         .select({ strokes: holeScores.strokes })
         .from(holeScores)
@@ -102,8 +146,9 @@ export function useRound(roundId: string | null | undefined): {
         .then((rows) => rows.reduce((sum, r) => sum + (r.strokes ?? 0), 0));
 
       setBundle({
-        round: { ...round, combo: round.combo ?? null },
+        round: { ...round, combo: round.combo ?? null, tee: round.tee ?? null },
         roundNines: ordered,
+        yardageByCourseHoleId,
         totalScore,
       });
       setLoading(false);
@@ -165,6 +210,15 @@ export function useRound(roundId: string | null | undefined): {
     await load();
   }, [load, roundId]);
 
+  const abandonRound = useCallback(async () => {
+    if (!roundId) return;
+    await db
+      .update(rounds)
+      .set(withTimestamp({ abandonedAt: new Date().toISOString() }))
+      .where(eq(rounds.id, roundId));
+    await load();
+  }, [load, roundId]);
+
   const deleteRound = useCallback(async () => {
     if (!roundId) return;
 
@@ -190,15 +244,17 @@ export function useRound(roundId: string | null | undefined): {
     () => ({
       round: bundle.round,
       roundNines: bundle.roundNines,
+      yardageByCourseHoleId: bundle.yardageByCourseHoleId,
       totalScore: bundle.totalScore,
       loading,
       error,
       refresh,
       saveHole,
       completeRound,
+      abandonRound,
       deleteRound,
     }),
-    [bundle, loading, error, refresh, saveHole, completeRound, deleteRound]
+    [bundle, loading, error, refresh, saveHole, completeRound, abandonRound, deleteRound]
   );
 }
 

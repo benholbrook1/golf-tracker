@@ -156,10 +156,12 @@ export const rounds = sqliteTable(
       .notNull()
       .references(() => courses.id),
     comboId: text('combo_id').references(() => courseCombos.id), // null for 9-hole rounds
+    teeId: text('tee_id').references(() => courseTees.id), // null for legacy rounds; should be set for new rounds
     date: text('date').notNull(), // ISO-8601 date "YYYY-MM-DD"
     totalScore: integer('total_score').notNull().default(0),
     handicapDifferential: real('handicap_differential'),
     isComplete: integer('is_complete', { mode: 'boolean' }).notNull().default(false),
+    abandonedAt: text('abandoned_at'),
     ...timestamps,
   },
   (t) => ({
@@ -168,6 +170,8 @@ export const rounds = sqliteTable(
     isCompleteIdx: index('rounds_is_complete_idx').on(t.isComplete),
     courseIdIdx: index('rounds_course_id_idx').on(t.courseId),
     comboIdIdx: index('rounds_combo_id_idx').on(t.comboId),
+    teeIdIdx: index('rounds_tee_id_idx').on(t.teeId),
+    abandonedAtIdx: index('rounds_abandoned_at_idx').on(t.abandonedAt),
   })
 );
 
@@ -212,6 +216,7 @@ export const holeScores = sqliteTable(
     putts: integer('putts').notNull(),
     fairwayHit: integer('fairway_hit', { mode: 'boolean' }).notNull().default(false),
     gir: integer('gir', { mode: 'boolean' }).notNull().default(false),
+    penalties: integer('penalties').notNull().default(0),
     ...timestamps,
   },
   (t) => ({
@@ -275,6 +280,7 @@ export const courseCombosRelations = relations(courseCombos, ({ one, many }) => 
 export const roundsRelations = relations(rounds, ({ one, many }) => ({
   course: one(courses, { fields: [rounds.courseId], references: [courses.id] }),
   combo: one(courseCombos, { fields: [rounds.comboId], references: [courseCombos.id] }),
+  tee: one(courseTees, { fields: [rounds.teeId], references: [courseTees.id] }),
   roundNines: many(roundNines),
 }));
 

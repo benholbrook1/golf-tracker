@@ -27,6 +27,7 @@ export default function NewRoundScreen() {
   const courseDetail = useCourseDetail(selectedCourseId);
   const { refresh: refreshCourseDetail } = courseDetail;
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [selectedTeeId, setSelectedTeeId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [roundDate, setRoundDate] = useState(() => {
     const d = new Date();
@@ -49,6 +50,12 @@ export default function NewRoundScreen() {
       }
     }, [refresh, selectedCourseId, refreshCourseDetail])
   );
+
+  useEffect(() => {
+    if (!courseDetail.data) return;
+    const preferred = courseDetail.data.course.defaultTeeId ?? courseDetail.data.tees[0]?.id ?? null;
+    setSelectedTeeId(preferred);
+  }, [courseDetail.data?.course.id]);
 
   const selections = useMemo(() => {
     if (!courseDetail.data) return [];
@@ -73,6 +80,11 @@ export default function NewRoundScreen() {
 
   const onCreateRound = async () => {
     if (!selectedCourseId || !selection) return;
+    const teeId = selectedTeeId ?? courseDetail.data?.course.defaultTeeId ?? courseDetail.data?.tees[0]?.id ?? null;
+    if (!teeId) {
+      Alert.alert('Select tee', 'Pick the tee you played from.');
+      return;
+    }
     if (creating) return;
 
     setCreating(true);
@@ -83,6 +95,7 @@ export default function NewRoundScreen() {
           .values({
             courseId: selectedCourseId,
             comboId: selection.comboId,
+            teeId,
             date: toLocalYMD(roundDate),
             totalScore: 0,
           })
@@ -101,6 +114,7 @@ export default function NewRoundScreen() {
           .values({
             courseId: selectedCourseId,
             comboId: null,
+            teeId,
             date: toLocalYMD(roundDate),
             totalScore: 0,
           })
@@ -218,6 +232,25 @@ export default function NewRoundScreen() {
         ) : null}
       </View>
 
+      <Text style={styles.sectionTitle}>Tee</Text>
+      <Text style={styles.hint}>Which tee did you play today? (Used for showing correct yardages.)</Text>
+      {!selectedCourseId ? <Text style={styles.muted}>Pick a course first.</Text> : null}
+      {selectedCourseId && courseDetail.data?.tees.length ? (
+        <View style={styles.list}>
+          {courseDetail.data.tees.map((t) => (
+            <Pressable
+              key={t.id}
+              onPress={() => setSelectedTeeId(t.id)}
+              style={[styles.item, (selectedTeeId ?? courseDetail.data?.course.defaultTeeId) === t.id && styles.itemSelected]}
+            >
+              <Text style={styles.itemText}>{t.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : selectedCourseId && !courseDetail.loading ? (
+        <Text style={styles.error}>No tees found for this course.</Text>
+      ) : null}
+
       <Pressable
         onPress={onCreateRound}
         disabled={!selectedCourseId || !selection || creating}
@@ -309,5 +342,6 @@ const styles = StyleSheet.create({
   error: {
     color: '#c62828',
   },
+  muted: { fontWeight: '600', opacity: 0.7 },
 });
 

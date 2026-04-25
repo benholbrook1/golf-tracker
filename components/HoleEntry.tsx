@@ -16,6 +16,7 @@ export function HoleEntry({ par, initial, onSave }: Props) {
   const [putts, setPutts] = useState<number>(initial?.putts ?? 2);
   const [fairwayHit, setFairwayHit] = useState<boolean>(initial?.fairwayHit ?? false);
   const [gir, setGir] = useState<boolean>(initial?.gir ?? false);
+  const [penalties, setPenalties] = useState<number>(initial?.penalties ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,12 +25,25 @@ export function HoleEntry({ par, initial, onSave }: Props) {
     setPutts(initial?.putts ?? 2);
     setFairwayHit(initial?.fairwayHit ?? false);
     setGir(initial?.gir ?? false);
-  }, [initial?.strokes, initial?.putts, initial?.fairwayHit, initial?.gir, par]);
+    setPenalties(initial?.penalties ?? 0);
+  }, [
+    initial?.strokes,
+    initial?.putts,
+    initial?.fairwayHit,
+    initial?.gir,
+    initial?.penalties,
+    par,
+  ]);
 
   useEffect(() => {
     // keep putts valid as strokes change
     setPutts((p) => Math.min(p, strokes));
   }, [strokes]);
+
+  useEffect(() => {
+    // Fairway hit doesn't apply on par 3s.
+    if (par === 3) setFairwayHit(false);
+  }, [par]);
 
   const scoreLabel = useMemo(() => getScoreLabel(strokes, par), [strokes, par]);
 
@@ -42,7 +56,7 @@ export function HoleEntry({ par, initial, onSave }: Props) {
 
   const handleSave = async () => {
     setError(null);
-    const candidate: HoleScoreInput = { strokes, putts, fairwayHit, gir };
+    const candidate: HoleScoreInput = { strokes, putts, fairwayHit, gir, penalties };
     try {
       HoleScoreSchema.parse(candidate);
     } catch (e) {
@@ -93,13 +107,28 @@ export function HoleEntry({ par, initial, onSave }: Props) {
         </View>
       </View>
 
+      <View style={styles.row}>
+        <Text style={styles.label}>Penalties</Text>
+        <View style={styles.counter}>
+          <Pressable onPress={() => onDec(penalties, setPenalties, 0)} style={styles.counterButton}>
+            <Text style={styles.counterButtonText}>−</Text>
+          </Pressable>
+          <Text style={styles.value}>{penalties}</Text>
+          <Pressable onPress={() => onInc(penalties, setPenalties, 10)} style={styles.counterButton}>
+            <Text style={styles.counterButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+
       <View style={styles.toggles}>
-        <Pressable
-          onPress={() => setFairwayHit((v) => !v)}
-          style={[styles.toggle, fairwayHit && styles.toggleOn]}
-        >
-          <Text style={styles.toggleText}>Fairway</Text>
-        </Pressable>
+        {par !== 3 ? (
+          <Pressable
+            onPress={() => setFairwayHit((v) => !v)}
+            style={[styles.toggle, fairwayHit && styles.toggleOn]}
+          >
+            <Text style={styles.toggleText}>Fairway</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => setGir((v) => !v)} style={[styles.toggle, gir && styles.toggleOn]}>
           <Text style={styles.toggleText}>GIR</Text>
         </Pressable>

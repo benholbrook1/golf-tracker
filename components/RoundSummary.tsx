@@ -9,6 +9,7 @@ type Props = {
   avgPutts: number | null;
   girPct: number | null;
   fairwayPct: number | null;
+  totalPenalties: number;
   differential: number | null;
   scoreRows: Array<{ globalHole: number; par: number; strokes: number | null }>;
   onEditHole: (globalHole: number) => void;
@@ -20,6 +21,7 @@ export function RoundSummary({
   avgPutts,
   girPct,
   fairwayPct,
+  totalPenalties,
   differential,
   scoreRows,
   onEditHole,
@@ -47,6 +49,13 @@ export function RoundSummary({
         <View style={styles.stat}>
           <Text style={styles.statLabel}>FW%</Text>
           <Text style={styles.statValue}>{fairwayPct == null ? '—' : `${Math.round(fairwayPct)}%`}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Penalties</Text>
+          <Text style={styles.statValue}>{totalPenalties}</Text>
         </View>
       </View>
 

@@ -5,6 +5,7 @@ export const HoleScoreSchema = z.object({
   putts: z.number().int().min(0).max(10),
   fairwayHit: z.boolean(),
   gir: z.boolean(),
+  penalties: z.number().int().min(0).max(10),
 }).refine((v) => v.putts <= v.strokes, {
   message: 'Putts cannot exceed strokes',
   path: ['putts'],

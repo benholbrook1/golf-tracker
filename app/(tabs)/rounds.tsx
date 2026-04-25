@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Text } from '@/components/Themed';
 import { getResumeTarget } from '@/utils/resumeRound';
 import { db } from '@/db/client';
-import { courses, rounds } from '@/db/schema';
+import { courseCombos, courseNines, courseTees, courses, roundNines, rounds } from '@/db/schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
 type RoundRow = {
@@ -14,7 +14,11 @@ type RoundRow = {
   date: string;
   totalScore: number;
   isComplete: boolean;
+  abandonedAt: string | null;
   courseName: string;
+  teeName: string | null;
+  comboName: string | null;
+  nineNames: string[];
 };
 
 export default function RoundsTab() {
@@ -33,15 +37,42 @@ export default function RoundsTab() {
       date: rounds.date,
       totalScore: rounds.totalScore,
       isComplete: rounds.isComplete,
+      abandonedAt: rounds.abandonedAt,
       courseName: courses.name,
+      teeName: courseTees.name,
+      comboName: courseCombos.name,
     })
       .from(rounds)
       .innerJoin(courses, eq(rounds.courseId, courses.id))
+      .leftJoin(courseTees, eq(rounds.teeId, courseTees.id))
+      .leftJoin(courseCombos, eq(rounds.comboId, courseCombos.id))
       .where(and(isNull(rounds.deletedAt), isNull(courses.deletedAt)))
       .orderBy(desc(rounds.date))
-      .then((r) => {
+      .then(async (r) => {
         if (cancelled) return;
-        setRows(r);
+        // Pull round_nines + course_nines names for labeling 9-hole rounds (or to show both sides for 18s).
+        const byRound = await db
+          .select({
+            roundId: roundNines.roundId,
+            nineOrder: roundNines.nineOrder,
+            nineName: courseNines.name,
+          })
+          .from(roundNines)
+          .innerJoin(courseNines, eq(roundNines.nineId, courseNines.id))
+          .where(and(isNull(roundNines.deletedAt), isNull(courseNines.deletedAt)))
+          .then((rows) =>
+            rows.reduce<Record<string, Array<{ nineOrder: number; nineName: string }>>>((acc, row) => {
+              (acc[row.roundId] ??= []).push({ nineOrder: row.nineOrder, nineName: row.nineName });
+              return acc;
+            }, {})
+          );
+
+        setRows(
+          r.map((row) => ({
+            ...row,
+            nineNames: (byRound[row.id] ?? []).sort((a, b) => a.nineOrder - b.nineOrder).map((x) => x.nineName),
+          }))
+        );
         setLoading(false);
       })
       .catch((e) => {
@@ -95,14 +126,15 @@ export default function RoundsTab() {
                   {r.courseName} · {r.date}
                 </Text>
                 <Text style={styles.itemSub}>
-                  {r.isComplete ? 'Complete' : 'In progress'} · Total: {r.totalScore}
+                  {(r.comboName ? `18: ${r.comboName}` : r.nineNames.length ? `9: ${r.nineNames[0]}` : 'Round')}{r.teeName ? ` · ${r.teeName}` : ''}{' '}
+                  · {r.abandonedAt ? 'Abandoned' : r.isComplete ? 'Complete' : 'In progress'} · Total: {r.totalScore}
                 </Text>
               </Pressable>
             </Link>
             {!r.isComplete ? (
               <Pressable
                 onPress={() => onResume(r.id)}
-                disabled={resuming === r.id}
+                disabled={resuming === r.id || r.abandonedAt != null}
                 style={[styles.resume, resuming === r.id && styles.resumeDisabled]}
               >
                 <Text style={styles.resumeText}>{resuming === r.id ? '…' : 'Resume'}</Text>

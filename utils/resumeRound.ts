@@ -13,6 +13,7 @@ export async function getResumeTarget(
     where: and(eq(rounds.id, roundId), isNull(rounds.deletedAt)),
   });
   if (!round) return { type: 'summary' };
+  if (round.abandonedAt != null) return { type: 'summary' };
 
   const rns = await db.query.roundNines.findMany({
     where: and(eq(roundNines.roundId, roundId), isNull(roundNines.deletedAt)),

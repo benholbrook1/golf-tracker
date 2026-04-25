@@ -5,6 +5,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Text } from '@/components/Themed';
 import { HoleEntry } from '@/components/HoleEntry';
 import { useRound } from '@/hooks/useRound';
+import type { HoleScoreInput } from '@/utils/validators';
 
 export default function HoleScreen() {
   return (
@@ -20,7 +21,7 @@ function HoleScreenInner() {
   const roundId = params.id ?? null;
   const holeNumberGlobal = params.number ? Number(params.number) : NaN;
 
-  const { round, roundNines, loading, error, saveHole } = useRound(roundId);
+  const { round, roundNines, yardageByCourseHoleId, loading, error, saveHole } = useRound(roundId);
 
   const resolved = useMemo(() => {
     if (!Number.isFinite(holeNumberGlobal) || holeNumberGlobal < 1) return null;
@@ -48,7 +49,7 @@ function HoleScreenInner() {
     };
   }, [holeNumberGlobal, round, roundNines]);
 
-  const onSave = async (data: { strokes: number; putts: number; fairwayHit: boolean; gir: boolean }) => {
+  const onSave = async (data: HoleScoreInput) => {
     if (!resolved) return;
     await saveHole(resolved.rn.id, resolved.courseHole.id, resolved.holeNumberWithinNine, data);
 
@@ -85,7 +86,26 @@ function HoleScreenInner() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Hole {holeNumberGlobal}</Text>
-      <Text style={styles.subtitle}>{round.date}</Text>
+      <Text style={styles.subtitle}>
+        {round.date}
+        {round.tee ? ` · ${round.tee.name}` : ''}
+      </Text>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.metaText}>
+          Yards:{' '}
+          {yardageByCourseHoleId.get(resolved.courseHole.id) ??
+            resolved.courseHole.yards ??
+            '—'}
+        </Text>
+        <Text style={styles.metaText}>HCP: {resolved.courseHole.handicap ?? '—'}</Text>
+      </View>
+      {resolved.courseHole.notes ? (
+        <View style={styles.notesBox}>
+          <Text style={styles.notesLabel}>Notes</Text>
+          <Text style={styles.notesText}>{resolved.courseHole.notes}</Text>
+        </View>
+      ) : null}
 
       <HoleEntry
         par={resolved.courseHole.par}
@@ -96,6 +116,7 @@ function HoleScreenInner() {
                 putts: resolved.existing.putts,
                 fairwayHit: resolved.existing.fairwayHit,
                 gir: resolved.existing.gir,
+                penalties: resolved.existing.penalties,
               }
             : undefined
         }
@@ -149,6 +170,11 @@ const styles = StyleSheet.create({
   subtitle: {
     opacity: 0.8,
   },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  metaText: { fontWeight: '700', opacity: 0.8 },
+  notesBox: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, gap: 6 },
+  notesLabel: { fontSize: 12, fontWeight: '900', opacity: 0.7 },
+  notesText: { fontSize: 14, fontWeight: '600', opacity: 0.85 },
   nav: {
     flexDirection: 'row',
     gap: 10,
