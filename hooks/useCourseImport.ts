@@ -1,14 +1,18 @@
+import { createId } from '@paralleldrive/cuid2';
+
 import { db } from '@/db/client';
-import { courseCombos, courseHoles, courseNines, courses } from '@/db/schema';
+import { courseCombos, courseHoleTeeYardages, courseHoles, courseNines, courseTees, courses } from '@/db/schema';
 import type { ScorecardParseResult } from '@/utils/validators';
 import { ScorecardParseSchema } from '@/utils/validators';
+import { withTimestamp } from '@/utils/timestamps';
+import { eq } from 'drizzle-orm';
 
 export type ConfirmCourseImportResult = {
   courseId: string;
 };
 
 export type ConfirmScorecardParseOptions = {
-  /** Which parsed tee column to store as courseHoles.yards (0-based index into `tees` and each hole’s `yardages`). */
+  /** Which parsed tee column is the default and backs `course_holes.yards` (0-based index). */
   selectedTeeIndex: number;
 };
 
@@ -29,10 +33,29 @@ export async function confirmScorecardParse(
 
   const [course] = await db.insert(courses).values({ name }).returning();
 
+  const teeRows = await db
+    .insert(courseTees)
+    .values(
+      parsed.tees.map((label, i) => ({
+        id: createId(),
+        courseId: course.id,
+        name: label.trim() || `Tee ${i + 1}`,
+        sortOrder: i,
+        isDefault: i === selectedTeeIndex,
+      }))
+    )
+    .returning();
+
+  const defaultTee = teeRows[selectedTeeIndex];
+  if (!defaultTee) {
+    throw new Error('Tee data mismatch');
+  }
+
   const nineRows = await db
     .insert(courseNines)
     .values(
       parsed.nines.map((n) => ({
+        id: createId(),
         courseId: course.id,
         name: n.name,
       }))
@@ -43,6 +66,7 @@ export async function confirmScorecardParse(
 
   const holeValues = parsed.nines.flatMap((n, nineIdx) =>
     n.holes.map((h) => ({
+      id: createId(),
       nineId: nineIdByIndex[nineIdx]!,
       holeNumber: h.holeNumber,
       par: h.par,
@@ -51,14 +75,36 @@ export async function confirmScorecardParse(
     }))
   );
 
-  await db.insert(courseHoles).values(holeValues);
+  const holeRows = await db.insert(courseHoles).values(holeValues).returning();
 
-  // Default rating/slope for MVP course creation from scans (user can edit later).
+  // Map back to parsed shape for per-tee yardages: same order as flat hole list
+  let rowIdx = 0;
+  for (let ni = 0; ni < parsed.nines.length; ni++) {
+    for (const h of parsed.nines[ni]!.holes) {
+      const holeRow = holeRows[rowIdx++]!;
+      for (let ti = 0; ti < parsed.tees.length; ti++) {
+        const tr = teeRows[ti]!;
+        await db.insert(courseHoleTeeYardages).values({
+          id: createId(),
+          courseHoleId: holeRow.id,
+          courseTeeId: tr.id,
+          yards: h.yardages[ti] ?? null,
+        });
+      }
+    }
+  }
+
+  await db
+    .update(courses)
+    .set(withTimestamp({ defaultTeeId: defaultTee.id }))
+    .where(eq(courses.id, course.id));
+
   const defaultRating = 72.0;
   const defaultSlope = 113;
 
   if (nineRows.length === 2) {
     await db.insert(courseCombos).values({
+      id: createId(),
       courseId: course.id,
       name: '18 Holes',
       frontNineId: nineRows[0]!.id,
@@ -71,9 +117,33 @@ export async function confirmScorecardParse(
   if (nineRows.length === 3) {
     const [a, b, c] = nineRows;
     await db.insert(courseCombos).values([
-      { courseId: course.id, name: `${a.name}/${b.name}`, frontNineId: a.id, backNineId: b.id, rating: defaultRating, slope: defaultSlope },
-      { courseId: course.id, name: `${b.name}/${c.name}`, frontNineId: b.id, backNineId: c.id, rating: defaultRating, slope: defaultSlope },
-      { courseId: course.id, name: `${a.name}/${c.name}`, frontNineId: a.id, backNineId: c.id, rating: defaultRating, slope: defaultSlope },
+      {
+        id: createId(),
+        courseId: course.id,
+        name: `${a.name}/${b.name}`,
+        frontNineId: a.id,
+        backNineId: b.id,
+        rating: defaultRating,
+        slope: defaultSlope,
+      },
+      {
+        id: createId(),
+        courseId: course.id,
+        name: `${b.name}/${c.name}`,
+        frontNineId: b.id,
+        backNineId: c.id,
+        rating: defaultRating,
+        slope: defaultSlope,
+      },
+      {
+        id: createId(),
+        courseId: course.id,
+        name: `${a.name}/${c.name}`,
+        frontNineId: a.id,
+        backNineId: c.id,
+        rating: defaultRating,
+        slope: defaultSlope,
+      },
     ]);
   }
 

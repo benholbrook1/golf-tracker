@@ -40,7 +40,12 @@ export default function CoursesTab() {
         {courses.map((c) => (
           <Link key={c.id} href={`/course/${c.id}`} asChild>
             <Pressable style={styles.item}>
-              <Text style={styles.itemText}>{c.name}</Text>
+              <View style={styles.itemMain}>
+                <Text style={styles.itemText}>{c.name}</Text>
+                <Text style={styles.itemMeta}>
+                  {c.roundCount} round{c.roundCount === 1 ? '' : 's'}
+                </Text>
+              </View>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           </Link>
@@ -74,7 +79,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#999',
   },
-  itemText: { fontSize: 16, fontWeight: '800', flex: 1 },
+  itemMain: { flex: 1, gap: 2 },
+  itemText: { fontSize: 16, fontWeight: '800' },
+  itemMeta: { fontSize: 13, fontWeight: '600', opacity: 0.6 },
   chevron: { fontSize: 22, opacity: 0.4, fontWeight: '300' },
   error: { color: '#c62828' },
   empty: { fontSize: 15, fontWeight: '600', opacity: 0.8 },

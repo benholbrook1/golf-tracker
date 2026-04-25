@@ -16,11 +16,34 @@ export const courses = sqliteTable(
       .primaryKey()
       .$defaultFn(() => createId()),
     name: text('name').notNull(),
+    defaultTeeId: text('default_tee_id').references((): any => courseTees.id),
     ...timestamps,
   },
   (t) => ({
     deletedAtIdx: index('courses_deleted_at_idx').on(t.deletedAt),
     nameIdx: index('courses_name_idx').on(t.name),
+    defaultTeeIdx: index('courses_default_tee_id_idx').on(t.defaultTeeId),
+  })
+);
+
+// Named tee plate at a facility (e.g. Blue, White). Yardages are per (`course_hole` × `course_tee`).
+export const courseTees = sqliteTable(
+  'course_tees',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    courseId: text('course_id')
+      .notNull()
+      .references(() => courses.id),
+    name: text('name').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+    ...timestamps,
+  },
+  (t) => ({
+    deletedAtIdx: index('course_tees_deleted_at_idx').on(t.deletedAt),
+    courseIdIdx: index('course_tees_course_id_idx').on(t.courseId),
   })
 );
 
@@ -57,13 +80,38 @@ export const courseHoles = sqliteTable(
     holeNumber: integer('hole_number').notNull(), // 1–9 within the nine
     par: integer('par').notNull(), // 3–6 (validated at boundary; 3–5 typical)
     handicap: integer('handicap'), // stroke index; often 1–9 per nine or 1–18; nullable
+    /** Mirrors the default tee’s yardage for legacy reads (round play). */
     yards: integer('yards'), // nullable
+    notes: text('notes'),
     ...timestamps,
   },
   (t) => ({
     deletedAtIdx: index('course_holes_deleted_at_idx').on(t.deletedAt),
     nineIdIdx: index('course_holes_nine_id_idx').on(t.nineId),
     nineHoleNumberUnique: uniqueIndex('course_holes_nine_id_hole_number_uq').on(t.nineId, t.holeNumber),
+  })
+);
+
+export const courseHoleTeeYardages = sqliteTable(
+  'course_hole_tee_yardages',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    courseHoleId: text('course_hole_id')
+      .notNull()
+      .references(() => courseHoles.id),
+    courseTeeId: text('course_tee_id')
+      .notNull()
+      .references(() => courseTees.id),
+    yards: integer('yards'),
+    ...timestamps,
+  },
+  (t) => ({
+    deletedAtIdx: index('course_hole_tee_yardages_deleted_at_idx').on(t.deletedAt),
+    courseHoleIdIdx: index('course_hole_tee_yardages_hole_id_idx').on(t.courseHoleId),
+    courseTeeIdIdx: index('course_hole_tee_yardages_tee_id_idx').on(t.courseTeeId),
+    holeTeeUq: uniqueIndex('course_hole_tee_yardage_hole_tee_uq').on(t.courseHoleId, t.courseTeeId),
   })
 );
 
@@ -181,10 +229,17 @@ export const holeScores = sqliteTable(
   })
 );
 
-export const coursesRelations = relations(courses, ({ many }) => ({
+export const coursesRelations = relations(courses, ({ many, one }) => ({
   nines: many(courseNines),
   combos: many(courseCombos),
   rounds: many(rounds),
+  tees: many(courseTees),
+  defaultTee: one(courseTees, { fields: [courses.defaultTeeId], references: [courseTees.id] }),
+}));
+
+export const courseTeesRelations = relations(courseTees, ({ one, many }) => ({
+  course: one(courses, { fields: [courseTees.courseId], references: [courses.id] }),
+  holeYardages: many(courseHoleTeeYardages),
 }));
 
 export const courseNinesRelations = relations(courseNines, ({ one, many }) => ({
@@ -198,6 +253,12 @@ export const courseNinesRelations = relations(courseNines, ({ one, many }) => ({
 export const courseHolesRelations = relations(courseHoles, ({ one, many }) => ({
   nine: one(courseNines, { fields: [courseHoles.nineId], references: [courseNines.id] }),
   holeScores: many(holeScores),
+  teeYardages: many(courseHoleTeeYardages),
+}));
+
+export const courseHoleTeeYardagesRelations = relations(courseHoleTeeYardages, ({ one }) => ({
+  hole: one(courseHoles, { fields: [courseHoleTeeYardages.courseHoleId], references: [courseHoles.id] }),
+  tee: one(courseTees, { fields: [courseHoleTeeYardages.courseTeeId], references: [courseTees.id] }),
 }));
 
 export const courseCombosRelations = relations(courseCombos, ({ one, many }) => ({

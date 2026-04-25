@@ -1,0 +1,1082 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "b7b6915b-1a27-4cf6-818b-c1c0f9aaad74",
+  "prevId": "d4d56a64-e15b-4731-b33a-e899f23b59f7",
+  "tables": {
+    "course_combos": {
+      "name": "course_combos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "front_nine_id": {
+          "name": "front_nine_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "back_nine_id": {
+          "name": "back_nine_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rating": {
+          "name": "rating",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slope": {
+          "name": "slope",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "course_combos_deleted_at_idx": {
+          "name": "course_combos_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "course_combos_course_id_idx": {
+          "name": "course_combos_course_id_idx",
+          "columns": [
+            "course_id"
+          ],
+          "isUnique": false
+        },
+        "course_combos_front_nine_id_idx": {
+          "name": "course_combos_front_nine_id_idx",
+          "columns": [
+            "front_nine_id"
+          ],
+          "isUnique": false
+        },
+        "course_combos_back_nine_id_idx": {
+          "name": "course_combos_back_nine_id_idx",
+          "columns": [
+            "back_nine_id"
+          ],
+          "isUnique": false
+        },
+        "course_combos_course_id_front_back_uq": {
+          "name": "course_combos_course_id_front_back_uq",
+          "columns": [
+            "course_id",
+            "front_nine_id",
+            "back_nine_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "course_combos_course_id_courses_id_fk": {
+          "name": "course_combos_course_id_courses_id_fk",
+          "tableFrom": "course_combos",
+          "tableTo": "courses",
+          "columnsFrom": [
+            "course_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "course_combos_front_nine_id_course_nines_id_fk": {
+          "name": "course_combos_front_nine_id_course_nines_id_fk",
+          "tableFrom": "course_combos",
+          "tableTo": "course_nines",
+          "columnsFrom": [
+            "front_nine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "course_combos_back_nine_id_course_nines_id_fk": {
+          "name": "course_combos_back_nine_id_course_nines_id_fk",
+          "tableFrom": "course_combos",
+          "tableTo": "course_nines",
+          "columnsFrom": [
+            "back_nine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "course_hole_tee_yardages": {
+      "name": "course_hole_tee_yardages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_hole_id": {
+          "name": "course_hole_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_tee_id": {
+          "name": "course_tee_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "yards": {
+          "name": "yards",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "course_hole_tee_yardages_deleted_at_idx": {
+          "name": "course_hole_tee_yardages_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "course_hole_tee_yardages_hole_id_idx": {
+          "name": "course_hole_tee_yardages_hole_id_idx",
+          "columns": [
+            "course_hole_id"
+          ],
+          "isUnique": false
+        },
+        "course_hole_tee_yardages_tee_id_idx": {
+          "name": "course_hole_tee_yardages_tee_id_idx",
+          "columns": [
+            "course_tee_id"
+          ],
+          "isUnique": false
+        },
+        "course_hole_tee_yardage_hole_tee_uq": {
+          "name": "course_hole_tee_yardage_hole_tee_uq",
+          "columns": [
+            "course_hole_id",
+            "course_tee_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "course_hole_tee_yardages_course_hole_id_course_holes_id_fk": {
+          "name": "course_hole_tee_yardages_course_hole_id_course_holes_id_fk",
+          "tableFrom": "course_hole_tee_yardages",
+          "tableTo": "course_holes",
+          "columnsFrom": [
+            "course_hole_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "course_hole_tee_yardages_course_tee_id_course_tees_id_fk": {
+          "name": "course_hole_tee_yardages_course_tee_id_course_tees_id_fk",
+          "tableFrom": "course_hole_tee_yardages",
+          "tableTo": "course_tees",
+          "columnsFrom": [
+            "course_tee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "course_holes": {
+      "name": "course_holes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nine_id": {
+          "name": "nine_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hole_number": {
+          "name": "hole_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "par": {
+          "name": "par",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "handicap": {
+          "name": "handicap",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "yards": {
+          "name": "yards",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "course_holes_deleted_at_idx": {
+          "name": "course_holes_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "course_holes_nine_id_idx": {
+          "name": "course_holes_nine_id_idx",
+          "columns": [
+            "nine_id"
+          ],
+          "isUnique": false
+        },
+        "course_holes_nine_id_hole_number_uq": {
+          "name": "course_holes_nine_id_hole_number_uq",
+          "columns": [
+            "nine_id",
+            "hole_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "course_holes_nine_id_course_nines_id_fk": {
+          "name": "course_holes_nine_id_course_nines_id_fk",
+          "tableFrom": "course_holes",
+          "tableTo": "course_nines",
+          "columnsFrom": [
+            "nine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "course_nines": {
+      "name": "course_nines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "course_nines_deleted_at_idx": {
+          "name": "course_nines_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "course_nines_course_id_idx": {
+          "name": "course_nines_course_id_idx",
+          "columns": [
+            "course_id"
+          ],
+          "isUnique": false
+        },
+        "course_nines_course_id_name_uq": {
+          "name": "course_nines_course_id_name_uq",
+          "columns": [
+            "course_id",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "course_nines_course_id_courses_id_fk": {
+          "name": "course_nines_course_id_courses_id_fk",
+          "tableFrom": "course_nines",
+          "tableTo": "courses",
+          "columnsFrom": [
+            "course_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "course_tees": {
+      "name": "course_tees",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "course_tees_deleted_at_idx": {
+          "name": "course_tees_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "course_tees_course_id_idx": {
+          "name": "course_tees_course_id_idx",
+          "columns": [
+            "course_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "course_tees_course_id_courses_id_fk": {
+          "name": "course_tees_course_id_courses_id_fk",
+          "tableFrom": "course_tees",
+          "tableTo": "courses",
+          "columnsFrom": [
+            "course_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "courses": {
+      "name": "courses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "default_tee_id": {
+          "name": "default_tee_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "courses_deleted_at_idx": {
+          "name": "courses_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "courses_name_idx": {
+          "name": "courses_name_idx",
+          "columns": [
+            "name"
+          ],
+          "isUnique": false
+        },
+        "courses_default_tee_id_idx": {
+          "name": "courses_default_tee_id_idx",
+          "columns": [
+            "default_tee_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "courses_default_tee_id_course_tees_id_fk": {
+          "name": "courses_default_tee_id_course_tees_id_fk",
+          "tableFrom": "courses",
+          "tableTo": "course_tees",
+          "columnsFrom": [
+            "default_tee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "hole_scores": {
+      "name": "hole_scores",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "round_nine_id": {
+          "name": "round_nine_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_hole_id": {
+          "name": "course_hole_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hole_number": {
+          "name": "hole_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "strokes": {
+          "name": "strokes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "putts": {
+          "name": "putts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fairway_hit": {
+          "name": "fairway_hit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "gir": {
+          "name": "gir",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "hole_scores_deleted_at_idx": {
+          "name": "hole_scores_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "hole_scores_round_nine_id_idx": {
+          "name": "hole_scores_round_nine_id_idx",
+          "columns": [
+            "round_nine_id"
+          ],
+          "isUnique": false
+        },
+        "hole_scores_course_hole_id_idx": {
+          "name": "hole_scores_course_hole_id_idx",
+          "columns": [
+            "course_hole_id"
+          ],
+          "isUnique": false
+        },
+        "hole_scores_round_nine_id_hole_number_uq": {
+          "name": "hole_scores_round_nine_id_hole_number_uq",
+          "columns": [
+            "round_nine_id",
+            "hole_number"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "hole_scores_round_nine_id_round_nines_id_fk": {
+          "name": "hole_scores_round_nine_id_round_nines_id_fk",
+          "tableFrom": "hole_scores",
+          "tableTo": "round_nines",
+          "columnsFrom": [
+            "round_nine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hole_scores_course_hole_id_course_holes_id_fk": {
+          "name": "hole_scores_course_hole_id_course_holes_id_fk",
+          "tableFrom": "hole_scores",
+          "tableTo": "course_holes",
+          "columnsFrom": [
+            "course_hole_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "round_nines": {
+      "name": "round_nines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nine_id": {
+          "name": "nine_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nine_order": {
+          "name": "nine_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "round_nines_deleted_at_idx": {
+          "name": "round_nines_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "round_nines_round_id_idx": {
+          "name": "round_nines_round_id_idx",
+          "columns": [
+            "round_id"
+          ],
+          "isUnique": false
+        },
+        "round_nines_nine_id_idx": {
+          "name": "round_nines_nine_id_idx",
+          "columns": [
+            "nine_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "round_nines_round_id_rounds_id_fk": {
+          "name": "round_nines_round_id_rounds_id_fk",
+          "tableFrom": "round_nines",
+          "tableTo": "rounds",
+          "columnsFrom": [
+            "round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "round_nines_nine_id_course_nines_id_fk": {
+          "name": "round_nines_nine_id_course_nines_id_fk",
+          "tableFrom": "round_nines",
+          "tableTo": "course_nines",
+          "columnsFrom": [
+            "nine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "rounds": {
+      "name": "rounds",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "combo_id": {
+          "name": "combo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "total_score": {
+          "name": "total_score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "handicap_differential": {
+          "name": "handicap_differential",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_complete": {
+          "name": "is_complete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "rounds_deleted_at_idx": {
+          "name": "rounds_deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "rounds_date_idx": {
+          "name": "rounds_date_idx",
+          "columns": [
+            "date"
+          ],
+          "isUnique": false
+        },
+        "rounds_is_complete_idx": {
+          "name": "rounds_is_complete_idx",
+          "columns": [
+            "is_complete"
+          ],
+          "isUnique": false
+        },
+        "rounds_course_id_idx": {
+          "name": "rounds_course_id_idx",
+          "columns": [
+            "course_id"
+          ],
+          "isUnique": false
+        },
+        "rounds_combo_id_idx": {
+          "name": "rounds_combo_id_idx",
+          "columns": [
+            "combo_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "rounds_course_id_courses_id_fk": {
+          "name": "rounds_course_id_courses_id_fk",
+          "tableFrom": "rounds",
+          "tableTo": "courses",
+          "columnsFrom": [
+            "course_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "rounds_combo_id_course_combos_id_fk": {
+          "name": "rounds_combo_id_course_combos_id_fk",
+          "tableFrom": "rounds",
+          "tableTo": "course_combos",
+          "columnsFrom": [
+            "combo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
