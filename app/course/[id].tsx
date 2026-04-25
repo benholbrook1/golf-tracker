@@ -404,6 +404,23 @@ export default function CourseDetailScreen() {
     }
     setSaving(true);
     try {
+      const existingSame = await db
+        .select({ id: courseCombos.id, name: courseCombos.name })
+        .from(courseCombos)
+        .where(
+          and(
+            eq(courseCombos.courseId, data.course.id),
+            isNull(courseCombos.deletedAt),
+            eq(courseCombos.frontNineId, newFrontId),
+            eq(courseCombos.backNineId, newBackId)
+          )
+        )
+        .limit(1);
+      if (existingSame[0]) {
+        Alert.alert('Already exists', `That configuration already exists as “${existingSame[0].name}”.`);
+        return;
+      }
+
       await db.insert(courseCombos).values({
         id: createId(),
         courseId: data.course.id,
@@ -420,7 +437,30 @@ export default function CourseDetailScreen() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('constraint')) {
-        Alert.alert('Already exists', 'A configuration with this front and back nine is already saved. Edit the name and rating in the list above.');
+        const existingEither = await db
+          .select({
+            id: courseCombos.id,
+            name: courseCombos.name,
+            frontNineId: courseCombos.frontNineId,
+            backNineId: courseCombos.backNineId,
+          })
+          .from(courseCombos)
+          .where(and(eq(courseCombos.courseId, data.course.id), isNull(courseCombos.deletedAt)));
+
+        const exact = existingEither.find((c) => c.frontNineId === newFrontId && c.backNineId === newBackId);
+        const reverse = existingEither.find((c) => c.frontNineId === newBackId && c.backNineId === newFrontId);
+        if (exact) {
+          Alert.alert('Already exists', `That exact front/back pair already exists as “${exact.name}”.`);
+          return;
+        }
+        if (reverse) {
+          Alert.alert(
+            'Blocked by uniqueness',
+            `The reverse order already exists as “${reverse.name}”.\n\nIf you still want both directions saved, we’ll need to change the uniqueness rule.`
+          );
+          return;
+        }
+        Alert.alert('Already exists', 'A configuration with this front and back nine is already saved.');
         return;
       }
       Alert.alert('Could not add', msg);

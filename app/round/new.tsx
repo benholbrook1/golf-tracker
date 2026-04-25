@@ -27,6 +27,7 @@ export default function NewRoundScreen() {
   const courseDetail = useCourseDetail(selectedCourseId);
   const { refresh: refreshCourseDetail } = courseDetail;
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [playBackFirst, setPlayBackFirst] = useState(false);
   const [creating, setCreating] = useState(false);
   const [roundDate, setRoundDate] = useState(() => {
     const d = new Date();
@@ -49,6 +50,11 @@ export default function NewRoundScreen() {
       }
     }, [refresh, selectedCourseId, refreshCourseDetail])
   );
+
+  useEffect(() => {
+    // Reset the flip toggle when the course or selection changes.
+    setPlayBackFirst(false);
+  }, [selectedCourseId, selection?.type, selection && selection.type === 'combo' ? selection.comboId : null, selection && selection.type === 'nine' ? selection.nineId : null]);
 
   const selections = useMemo(() => {
     if (!courseDetail.data) return [];
@@ -89,9 +95,11 @@ export default function NewRoundScreen() {
           .returning();
 
         const round = inserted[0]!;
+        const firstNineId = playBackFirst ? selection.backNineId : selection.frontNineId;
+        const secondNineId = playBackFirst ? selection.frontNineId : selection.backNineId;
         await db.insert(roundNines).values([
-          { roundId: round.id, nineId: selection.frontNineId, nineOrder: 1 },
-          { roundId: round.id, nineId: selection.backNineId, nineOrder: 2 },
+          { roundId: round.id, nineId: firstNineId, nineOrder: 1 },
+          { roundId: round.id, nineId: secondNineId, nineOrder: 2 },
         ]);
 
         router.replace(`/round/${round.id}/hole/1`);
@@ -204,7 +212,11 @@ export default function NewRoundScreen() {
               : (selection as any).nineId === s.nineId);
 
           return (
-            <Pressable key={key} onPress={() => setSelection(s)} style={[styles.item, selected && styles.itemSelected]}>
+            <Pressable
+              key={key}
+              onPress={() => setSelection(s)}
+              style={[styles.item, selected && styles.itemSelected]}
+            >
               <Text style={styles.itemText}>{s.type === 'combo' ? `18: ${s.label}` : `9: ${s.label}`}</Text>
             </Pressable>
           );
@@ -213,6 +225,15 @@ export default function NewRoundScreen() {
           <Text>No nines/combos found for this course.</Text>
         ) : null}
       </View>
+
+      {selection?.type === 'combo' ? (
+        <Pressable
+          onPress={() => setPlayBackFirst((v) => !v)}
+          style={[styles.item, playBackFirst && styles.itemSelected]}
+        >
+          <Text style={styles.itemText}>{playBackFirst ? 'Starting on: Back (flip)' : 'Starting on: Front'}</Text>
+        </Pressable>
+      ) : null}
 
       <Pressable
         onPress={onCreateRound}
