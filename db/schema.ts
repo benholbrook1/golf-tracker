@@ -55,8 +55,8 @@ export const courseHoles = sqliteTable(
       .notNull()
       .references(() => courseNines.id),
     holeNumber: integer('hole_number').notNull(), // 1–9 within the nine
-    par: integer('par').notNull(), // 3, 4, or 5 only (validated at boundary)
-    handicap: integer('handicap'), // 1–9 within the nine; nullable
+    par: integer('par').notNull(), // 3–6 (validated at boundary; 3–5 typical)
+    handicap: integer('handicap'), // stroke index; often 1–9 per nine or 1–18; nullable
     yards: integer('yards'), // nullable
     ...timestamps,
   },

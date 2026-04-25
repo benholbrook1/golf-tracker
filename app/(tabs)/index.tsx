@@ -15,6 +15,18 @@ export default function TabOneScreen() {
           <Text style={styles.devButtonText}>Dev: Run seed</Text>
         </Pressable>
       </Link>
+
+      <Link href="/course/scan" asChild>
+        <Pressable style={styles.devButton}>
+          <Text style={styles.devButtonText}>Scan scorecard</Text>
+        </Pressable>
+      </Link>
+
+      <Link href="/course/new" asChild>
+        <Pressable style={styles.devButton}>
+          <Text style={styles.devButtonText}>Manual course</Text>
+        </Pressable>
+      </Link>
     </View>
   );
 }

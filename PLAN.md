@@ -74,7 +74,8 @@ partracker/
 ├── hooks/
 │   ├── useRound.ts               # Round data + hole scores
 │   ├── useCourses.ts             # Course + nine + combo queries
-│   └── useStats.ts               # Analytics queries
+│   ├── useStats.ts               # Analytics queries
+│   └── useCourseImport.ts        # Course creation from scorecard parse (DB writes)
 ├── constants/
 │   └── golf.ts                   # Par ranges, ESC table, score labels
 └── app.json
@@ -308,19 +309,21 @@ export const HoleScoreSchema = z.object({
 
 export const CourseHoleSchema = z.object({
   holeNumber: z.number().int().min(1).max(9),
-  par:        z.number().int().min(3).max(5),
-  yards:      z.number().int().positive().nullable(),
-  handicap:   z.number().int().min(1).max(9).nullable(),
+  par:        z.number().int().min(3).max(6),
+  // One per tee label (root-level `tees`); DB stores a single set via selected tee on import
+  yardages:   z.array(z.number().int().min(0).max(2000).nullable()).min(1).max(16),
+  handicap:   z.number().int().min(1).max(18).nullable(),
 });
 
 // Output shape expected from the vision LLM scorecard parser (provider-agnostic)
 export const ScorecardParseSchema = z.object({
-  courseName: z.string().min(1).max(100),
+  courseName: z.string().min(1).max(300),
+  tees:       z.array(z.string().min(1).max(64)).min(1).max(16),
   nines: z.array(z.object({
-    name:  z.string().min(1),
+    name:  z.string().min(1).max(200),
     holes: z.array(CourseHoleSchema).length(9),
   })).min(1).max(3),
-});
+}) /* + refine: each hole.yardages.length === tees.length */;
 
 export type ScorecardParseResult = z.infer<typeof ScorecardParseSchema>;
 export type HoleScoreInput = z.infer<typeof HoleScoreSchema>;
@@ -421,76 +424,32 @@ export class HandicapEngine {
 ## 7. AI Scorecard Parser (`utils/scorecardParser.ts`)
 
 ```typescript
-import { ScorecardParseSchema, ScorecardParseResult } from './validators';
+// Canonical implementation lives in-repo at `utils/scorecardParser.ts`.
 
-const SYSTEM_PROMPT = `You parse golf scorecard images. Return ONLY a JSON object — no markdown, no explanation, no code fences.
+// It supports two modes:
+// 1) Proxy mode (recommended):
+//    - EXPO_PUBLIC_SCORECARD_LLM_PROXY_URL
+// 2) Personal-phone MVP mode (Gemini direct):
+//    - EXPO_PUBLIC_GEMINI_API_KEY
+//    - EXPO_PUBLIC_GEMINI_MODEL (optional; defaults to gemini-1.5-flash)
 
-Shape:
-{
-  "courseName": "string",
-  "nines": [
-    {
-      "name": "Front 9",
-      "holes": [
-        { "holeNumber": 1, "par": 4, "yards": 385, "handicap": 7 }
-      ]
-    }
-  ]
-}
-
-Rules:
-- Each nine has exactly 9 holes, numbered 1–9 within that nine
-- par must be 3, 4, or 5 only
-- yards and handicap are integers; use null if not legible
-- Return 1 nine for 9-hole cards, 2 for standard 18, 3 for 27-hole facilities
-- courseName is the full printed name`;
-
-export async function parseScorecardImage(
-  base64Image: string,
-  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
-): Promise<ScorecardParseResult> {
-  // Provider is intentionally pluggable. Implement this by calling your chosen
-  // vision-capable LLM with:
-  // - the image (base64 + mediaType)
-  // - SYSTEM_PROMPT above
-  // - a hard requirement to return JSON only
-  //
-  // IMPORTANT: Do not ship any long-lived provider API key in the app bundle
-  // for user-facing distribution. Use a thin backend/edge function proxy.
-  const response = await fetch('YOUR_LLM_PROXY_ENDPOINT', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mediaType,
-      base64Image,
-      systemPrompt: SYSTEM_PROMPT,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  // Expect your proxy to return either a raw JSON object or a JSON string.
-  const candidate = typeof data === 'string' ? data : (data?.json ?? data);
-  const clean = typeof candidate === 'string'
-    ? candidate.replace(/```json|```/g, '').trim()
-    : JSON.stringify(candidate);
-
-  // Zod validates before anything touches the DB
-  const parsed = JSON.parse(clean);
-  return ScorecardParseSchema.parse(parsed); // throws ZodError on bad output
-}
+// In both cases, the output is validated with `ScorecardParseSchema` before any DB write.
+// `normalizeScorecardParseJson` maps legacy `yards` → `yardages`, infers `tees` from column count if needed, and maps global hole labels (10–18, 19–27) to 1–9 per nine for `holeNumber`.
 ```
 
 > **API key**: For user-facing distribution, do not ship provider API keys in the app bundle. Use a thin backend/edge function proxy (Supabase Edge Function is fine) and keep keys server-side.
+
+> **Personal MVP exception**: direct Gemini mode uses `EXPO_PUBLIC_GEMINI_API_KEY`, which is bundled into the client build. This is OK for a phone-only summer build, but treat the key as **non-secret** (anyone with the binary can extract it).
+
+> **Local config (no paid proxy)**: keep secrets out of git by copying `.env.example` → `.env` at the repo root and setting `EXPO_PUBLIC_GEMINI_API_KEY` there. Expo loads `.env*` for `expo start` / dev clients; restart the dev server after edits.
+
+> **Implemented note**: `app/course/scan.tsx` reads the picked image as base64 with `expo-file-system` `File#base64()` before calling `parseScorecardImage()`. Review screen: editable **course name**, **tee set** (which parsed column becomes `course_holes.yards`), and per-hole edits.
 
 ---
 
 ## 8. Data Hooks
 
-Hooks abstract all DB queries. Screens never import `db` directly.
+Hooks abstract all DB queries. **Target rule**: screens/components should not import `db` directly (see Invariant #13.7 for current MVP exceptions).
 
 ### 8.1 `hooks/useCourses.ts`
 
@@ -607,11 +566,11 @@ On first load, calls `HandicapEngine.saveDifferential(roundId)` if the round is 
 
 **Flow**:
 1. User captures/selects image via `expo-image-picker` (MVP default for Expo)
-2. Image converted to base64
-3. `parseScorecardImage()` called — loading state shown
-4. Zod-validated result displayed for user review (editable grid of pars)
-5. User confirms → course + nines + holes written to DB
-6. Navigate to `course/[id]` or directly to round setup
+2. Image converted to base64 via `expo-file-system` (`File#base64()`)
+3. `parseScorecardImage()` called automatically — loading state shown (result includes `tees[]` and per-hole `yardages[]` for multi-tee scorecards; legacy `yards` is normalized in `normalizeScorecardParseJson`)
+4. Zod-validated result displayed for user review: **course name** (saved as `courses.name`), **tee set** (which column maps to `course_holes.yards`), editable par / yardage (for the selected tee) / handicap
+5. User confirms → `confirmScorecardParse(data, { selectedTeeIndex })` writes course + nines + holes (one yardage per hole from the selected tee)
+6. Navigate to round setup (`/round/new`)
 
 **Never write to DB before user confirms the parsed result.**
 
@@ -716,9 +675,9 @@ Run with: open `app/seed.tsx` in the simulator and tap **Run seed** (recommended
 - [x] `components/HandicapBadge.tsx` — displays current index, handles null (< 3 rounds)
 - [x] `hooks/useStats.ts` — stats aggregates + trends (implemented with Drizzle selects + in-JS aggregates; avoids raw `sql` template fragments)
 - [x] `app/(tabs)/two.tsx` (Stats tab) — dashboard: GIR%, FW% (par 3 excluded), avg putts/hole, last-10 score/putts spark bars, avg putts-by-hole grid
-- [ ] `utils/scorecardParser.ts` — provider-agnostic vision parse + Zod validation
-- [ ] `app/course/scan.tsx` — camera capture, parse, editable review, confirm to DB
-- [ ] `app/course/new.tsx` — manual course entry fallback (same DB writes as scanner confirm)
+- [x] `utils/scorecardParser.ts` — provider-agnostic vision parse + Zod validation (proxy via `EXPO_PUBLIC_SCORECARD_LLM_PROXY_URL`, or personal MVP direct Gemini via `EXPO_PUBLIC_GEMINI_API_KEY`)
+- [x] `app/course/scan.tsx` — photo pick → base64 → parse → editable review → confirm to DB (`confirmScorecardParse`)
+- [x] `app/course/new.tsx` — manual course entry fallback (default 18-hole template; same confirm path as scanner)
 - [ ] **Gate**: scan a real scorecard photo, verify parsed output, confirm to DB, start a round using scanned course
 
 ### Phase 4 — Sync-Ready Hardening
@@ -765,4 +724,4 @@ These are explicitly deferred. Do not implement during MVP phases.
 
 ---
 
-*Last updated: 2026-04-24 — Phase 1–2 implemented; Phase 3 stats implemented; scanner still pending.*
+*Last updated: 2026-04-24 — Phase 1–2 implemented; Phase 3 stats + scanner: multi-tee parse (`tees` + `yardages[]`), user picks tee + course name on review, `confirmScorecardParse` stores selected set as `course_holes.yards`; optional proxy or local `.env` Gemini; remaining work is real-world scan tuning + hardening if distributing beyond a personal device.*
