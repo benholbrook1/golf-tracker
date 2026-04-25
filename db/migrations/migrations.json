@@ -30,6 +30,12 @@
         "when": 1777079400000,
         "tag": "0004_rounds_abandoned",
         "breakpoints": true
+      },
+      {
+        "idx": 5,
+        "when": 1777080000000,
+        "tag": "0005_courses_image_key",
+        "breakpoints": true
       }
     ]
   },
@@ -38,6 +44,7 @@
     "m0001": "CREATE TABLE `course_tees` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`course_id` text NOT NULL,\n\t`name` text NOT NULL,\n\t`sort_order` integer DEFAULT 0 NOT NULL,\n\t`is_default` integer DEFAULT false NOT NULL,\n\t`created_at` text NOT NULL,\n\t`updated_at` text NOT NULL,\n\t`deleted_at` text,\n\tFOREIGN KEY (`course_id`) REFERENCES `courses`(`id`) ON UPDATE no action ON DELETE no action\n);\n--> statement-breakpoint\nCREATE INDEX `course_tees_deleted_at_idx` ON `course_tees` (`deleted_at`);--> statement-breakpoint\nCREATE INDEX `course_tees_course_id_idx` ON `course_tees` (`course_id`);--> statement-breakpoint\nCREATE TABLE `course_hole_tee_yardages` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`course_hole_id` text NOT NULL,\n\t`course_tee_id` text NOT NULL,\n\t`yards` integer,\n\t`created_at` text NOT NULL,\n\t`updated_at` text NOT NULL,\n\t`deleted_at` text,\n\tFOREIGN KEY (`course_hole_id`) REFERENCES `course_holes`(`id`) ON UPDATE no action ON DELETE no action,\n\tFOREIGN KEY (`course_tee_id`) REFERENCES `course_tees`(`id`) ON UPDATE no action ON DELETE no action\n);\n--> statement-breakpoint\nCREATE INDEX `course_hole_tee_yardages_deleted_at_idx` ON `course_hole_tee_yardages` (`deleted_at`);--> statement-breakpoint\nCREATE INDEX `course_hole_tee_yardages_hole_id_idx` ON `course_hole_tee_yardages` (`course_hole_id`);--> statement-breakpoint\nCREATE INDEX `course_hole_tee_yardages_tee_id_idx` ON `course_hole_tee_yardages` (`course_tee_id`);--> statement-breakpoint\nCREATE UNIQUE INDEX `course_hole_tee_yardage_hole_tee_uq` ON `course_hole_tee_yardages` (`course_hole_id`,`course_tee_id`);--> statement-breakpoint\nALTER TABLE `course_holes` ADD `notes` text;--> statement-breakpoint\nALTER TABLE `courses` ADD `default_tee_id` text REFERENCES course_tees(id);--> statement-breakpoint\nCREATE INDEX `courses_default_tee_id_idx` ON `courses` (`default_tee_id`);\n",
     "m0002": "-- Allow saving both directions (front/back vs back/front) and multiple variants.\n-- Old rule: unique(course_id, front_nine_id, back_nine_id)\n-- New rule: unique(course_id, name)\n\nDROP INDEX IF EXISTS `course_combos_course_id_front_back_uq`;\nCREATE UNIQUE INDEX `course_combos_course_id_name_uq` ON `course_combos` (`course_id`,`name`);\n",
     "m0003": "-- Store which tee was played for a round.\n\nALTER TABLE `rounds` ADD `tee_id` text REFERENCES course_tees(id);\nCREATE INDEX `rounds_tee_id_idx` ON `rounds` (`tee_id`);\n",
-    "m0004": "-- Mark a round as abandoned/cancelled without deleting it.\n\nALTER TABLE `rounds` ADD `abandoned_at` text;\nCREATE INDEX `rounds_abandoned_at_idx` ON `rounds` (`abandoned_at`);\n"
+    "m0004": "-- Mark a round as abandoned/cancelled without deleting it.\n\nALTER TABLE `rounds` ADD `abandoned_at` text;\nCREATE INDEX `rounds_abandoned_at_idx` ON `rounds` (`abandoned_at`);\n",
+    "m0005": "-- Store a stock image key for course cards.\n\nALTER TABLE `courses` ADD `image_key` text;\nCREATE INDEX `courses_image_key_idx` ON `courses` (`image_key`);\n"
   }
 }

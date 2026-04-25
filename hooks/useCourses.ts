@@ -18,7 +18,23 @@ type Loadable<T> = {
   data: T;
 };
 
-export type CourseListRow = typeof courses.$inferSelect & { roundCount: number };
+export type CourseListRow = typeof courses.$inferSelect & {
+  roundCount: number;
+  /** best-effort 18-hole par if a combo exists */
+  parTotal: number | null;
+  /** 1–5 derived from combo slope */
+  difficulty: 1 | 2 | 3 | 4 | 5 | null;
+};
+
+function slopeToDifficulty(slope: number): 1 | 2 | 3 | 4 | 5 {
+  // Typical slopes: ~90–155. Map roughly to 1–5.
+  const v = Math.round((slope - 90) / 15) + 1;
+  if (v <= 1) return 1;
+  if (v === 2) return 2;
+  if (v === 3) return 3;
+  if (v === 4) return 4;
+  return 5;
+}
 
 export function useCourses(): {
   courses: CourseListRow[];
@@ -48,17 +64,52 @@ export function useCourses(): {
         .from(rounds)
         .where(isNull(rounds.deletedAt))
         .groupBy(rounds.courseId),
+      db.select().from(courseCombos).where(isNull(courseCombos.deletedAt)),
+      db.select().from(courseHoles).where(isNull(courseHoles.deletedAt)),
     ])
-      .then(([courseRows, countRows]) => {
+      .then(([courseRows, countRows, comboRows, holeRows]) => {
         if (cancelled) return;
         const cnt = new Map<string, number>();
         for (const r of countRows) {
           cnt.set(r.courseId, r.n);
         }
-        const withCounts = courseRows.map((c) => ({
-          ...c,
-          roundCount: Number(cnt.get(c.id) ?? 0),
-        }));
+
+        const combosByCourse = comboRows.reduce<Record<string, typeof comboRows>>((acc, c) => {
+          (acc[c.courseId] ??= []).push(c);
+          return acc;
+        }, {});
+        for (const k of Object.keys(combosByCourse)) {
+          combosByCourse[k]!.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        }
+
+        const holesByNine = holeRows.reduce<Record<string, typeof holeRows>>((acc, h) => {
+          (acc[h.nineId] ??= []).push(h);
+          return acc;
+        }, {});
+        for (const k of Object.keys(holesByNine)) {
+          holesByNine[k]!.sort((a, b) => a.holeNumber - b.holeNumber);
+        }
+
+        const withCounts = courseRows.map((c) => {
+          const combos = combosByCourse[c.id] ?? [];
+          const preferred = combos.find((x) => x.name === '18 Holes') ?? combos[0] ?? null;
+          let parTotal: number | null = null;
+          let difficulty: CourseListRow['difficulty'] = null;
+          if (preferred) {
+            const front = holesByNine[preferred.frontNineId] ?? [];
+            const back = holesByNine[preferred.backNineId] ?? [];
+            if (front.length || back.length) {
+              parTotal = [...front, ...back].reduce((s, h) => s + (h.par ?? 0), 0);
+            }
+            difficulty = slopeToDifficulty(preferred.slope);
+          }
+          return {
+            ...c,
+            roundCount: Number(cnt.get(c.id) ?? 0),
+            parTotal,
+            difficulty,
+          };
+        });
         const sorted = [...withCounts].sort((a, b) => {
           if (b.roundCount !== a.roundCount) return b.roundCount - a.roundCount;
           return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });

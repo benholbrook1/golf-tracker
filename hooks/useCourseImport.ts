@@ -31,7 +31,7 @@ export async function confirmScorecardParse(
     throw new Error('Invalid tee selection');
   }
 
-  const [course] = await db.insert(courses).values({ name }).returning();
+  const [course] = await db.insert(courses).values({ name, imageKey: 'stock-golf-1' }).returning();
 
   const teeRows = await db
     .insert(courseTees)

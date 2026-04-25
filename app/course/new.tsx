@@ -1,9 +1,10 @@
 import { createId } from '@paralleldrive/cuid2';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Text } from '@/components/Themed';
+import { STOCK_COURSE_IMAGE_KEYS, type StockCourseImageKey, stockCourseImages } from '@/constants/courseImages';
 import { db } from '@/db/client';
 import { courseCombos, courseHoleTeeYardages, courseHoles, courseNines, courseTees, courses } from '@/db/schema';
 import { withTimestamp } from '@/utils/timestamps';
@@ -33,6 +34,7 @@ function coerceInt(s: string, fallback: number): number {
 export default function ManualCourseScreen() {
   const [busy, setBusy] = useState(false);
   const [courseName, setCourseName] = useState('');
+  const [imageKey, setImageKey] = useState<StockCourseImageKey>('stock-golf-1');
 
   const [tees, setTees] = useState<TeeForm[]>([{ key: createId(), name: 'Default' }]);
   const [defaultTeeIdx, setDefaultTeeIdx] = useState(0);
@@ -116,7 +118,7 @@ export default function ManualCourseScreen() {
 
     setBusy(true);
     try {
-      const [course] = await db.insert(courses).values({ name }).returning();
+      const [course] = await db.insert(courses).values({ name, imageKey }).returning();
       if (!course) throw new Error('Failed to create course');
 
       const teeRows = await db
@@ -246,6 +248,23 @@ export default function ManualCourseScreen() {
         placeholderTextColor="#777"
         autoCapitalize="words"
       />
+
+      <Text style={styles.label}>Image</Text>
+      <View style={styles.row}>
+        {STOCK_COURSE_IMAGE_KEYS.map((k) => {
+          const on = imageKey === k;
+          return (
+            <Pressable
+              key={k}
+              onPress={() => setImageKey(k)}
+              style={[styles.imageChip, on && styles.imageChipOn]}
+            >
+              <Image source={stockCourseImages[k]} style={styles.imageThumb} />
+              <Text style={[styles.imageChipText, on && styles.imageChipTextOn]}>{k.replace('stock-golf-', '#')}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       <Text style={styles.section}>Tees</Text>
       <Text style={styles.hint}>Add tee names and pick the default tee (used for the main yards field).</Text>
@@ -425,6 +444,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  imageChip: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#999' },
+  imageChipOn: { backgroundColor: '#E8F5E9', borderColor: '#1B5E20' },
+  imageChipText: { fontWeight: '800' },
+  imageChipTextOn: { color: '#002106' },
+  imageThumb: { width: 44, height: 32, borderRadius: 8, marginBottom: 6 },
   chip: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#999' },
   chipOn: { backgroundColor: '#2f80ed', borderColor: '#2f80ed' },
   chipText: { fontSize: 12, fontWeight: '900' },

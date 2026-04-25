@@ -16,12 +16,14 @@ export const courses = sqliteTable(
       .primaryKey()
       .$defaultFn(() => createId()),
     name: text('name').notNull(),
+    imageKey: text('image_key'),
     defaultTeeId: text('default_tee_id').references((): any => courseTees.id),
     ...timestamps,
   },
   (t) => ({
     deletedAtIdx: index('courses_deleted_at_idx').on(t.deletedAt),
     nameIdx: index('courses_name_idx').on(t.name),
+    imageKeyIdx: index('courses_image_key_idx').on(t.imageKey),
     defaultTeeIdx: index('courses_default_tee_id_idx').on(t.defaultTeeId),
   })
 );
