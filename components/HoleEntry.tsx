@@ -45,9 +45,8 @@ export function HoleEntry({ par, initial, onSave }: Props) {
   const [fairwayHit, setFairwayHit] = useState(initial?.fairwayHit ?? false);
   const [gir, setGir] = useState(initial?.gir ?? false);
   const [penalties, setPenalties] = useState(initial?.penalties ?? 0);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
+  // Reset when navigating to a new hole
   useEffect(() => {
     setStrokes(initial?.strokes ?? par);
     setPutts(initial?.putts ?? 2);
@@ -56,32 +55,61 @@ export function HoleEntry({ par, initial, onSave }: Props) {
     setPenalties(initial?.penalties ?? 0);
   }, [initial?.strokes, initial?.putts, initial?.fairwayHit, initial?.gir, initial?.penalties, par]);
 
-  useEffect(() => { setPutts((p) => Math.min(p, strokes)); }, [strokes]);
   useEffect(() => { if (par === 3) setFairwayHit(false); }, [par]);
 
   const sc = useMemo(() => scoreColors(strokes, par), [strokes, par]);
   const label = useMemo(() => getScoreLabel(strokes, par), [strokes, par]);
 
-  const handleSave = async () => {
-    setError(null);
-    const candidate: HoleScoreInput = { strokes, putts, fairwayHit, gir, penalties };
-    try { HoleScoreSchema.parse(candidate); }
-    catch { setError('Please enter valid strokes / putts.'); return; }
-    setSaving(true);
-    try { await onSave(candidate); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setSaving(false); }
-  };
+  // Called after every user interaction with the new values merged in
+  function commit(overrides: Partial<HoleScoreInput>) {
+    const candidate: HoleScoreInput = {
+      strokes:    overrides.strokes    ?? strokes,
+      putts:      overrides.putts      ?? putts,
+      fairwayHit: overrides.fairwayHit ?? fairwayHit,
+      gir:        overrides.gir        ?? gir,
+      penalties:  overrides.penalties  ?? penalties,
+    };
+    const result = HoleScoreSchema.safeParse(candidate);
+    if (result.success) onSave(candidate);
+  }
+
+  function changeStrokes(next: number) {
+    const s = Math.max(1, Math.min(20, next));
+    const p = Math.min(putts, s); // clamp putts
+    setStrokes(s);
+    setPutts(p);
+    commit({ strokes: s, putts: p });
+  }
+
+  function changePutts(next: number) {
+    const p = Math.max(0, Math.min(Math.min(10, strokes), next));
+    setPutts(p);
+    commit({ putts: p });
+  }
+
+  function changePenalties(next: number) {
+    const v = Math.max(0, Math.min(10, next));
+    setPenalties(v);
+    commit({ penalties: v });
+  }
+
+  function toggleFairway() {
+    const v = !fairwayHit;
+    setFairwayHit(v);
+    commit({ fairwayHit: v });
+  }
+
+  function toggleGir() {
+    const v = !gir;
+    setGir(v);
+    commit({ gir: v });
+  }
 
   return (
     <View style={styles.card}>
-      {/* Score hero — dec/inc flank the coloured display */}
+      {/* Score hero */}
       <View style={styles.heroRow}>
-        <Pressable
-          onPress={() => setStrokes((v) => Math.max(1, v - 1))}
-          style={styles.heroBtn}
-          hitSlop={8}
-        >
+        <Pressable onPress={() => changeStrokes(strokes - 1)} style={styles.heroBtn} hitSlop={8}>
           <Text style={styles.heroBtnText}>−</Text>
         </Pressable>
 
@@ -90,60 +118,28 @@ export function HoleEntry({ par, initial, onSave }: Props) {
           <Text style={[styles.heroLabel, { color: sc.text }]}>{label}</Text>
         </View>
 
-        <Pressable
-          onPress={() => setStrokes((v) => Math.min(20, v + 1))}
-          style={styles.heroBtn}
-          hitSlop={8}
-        >
+        <Pressable onPress={() => changeStrokes(strokes + 1)} style={styles.heroBtn} hitSlop={8}>
           <Text style={styles.heroBtnText}>+</Text>
         </Pressable>
       </View>
 
       <View style={styles.divider} />
 
-      {/* Putts + Penalties (compact) */}
-      <Counter
-        label="Putts"
-        value={putts}
-        onDec={() => setPutts((v) => Math.max(0, v - 1))}
-        onInc={() => setPutts((v) => Math.min(Math.min(10, strokes), v + 1))}
-      />
-      <Counter
-        label="Penalties"
-        value={penalties}
-        onDec={() => setPenalties((v) => Math.max(0, v - 1))}
-        onInc={() => setPenalties((v) => Math.min(10, v + 1))}
-      />
+      <Counter label="Putts"     value={putts}     onDec={() => changePutts(putts - 1)}         onInc={() => changePutts(putts + 1)} />
+      <Counter label="Penalties" value={penalties} onDec={() => changePenalties(penalties - 1)} onInc={() => changePenalties(penalties + 1)} />
 
       <View style={styles.divider} />
 
-      {/* Fairway / GIR toggles */}
       <View style={styles.toggleRow}>
         {par !== 3 ? (
-          <Pressable
-            onPress={() => setFairwayHit((v) => !v)}
-            style={[styles.toggle, fairwayHit && styles.toggleOn]}
-          >
+          <Pressable onPress={toggleFairway} style={[styles.toggle, fairwayHit && styles.toggleOn]}>
             <Text style={[styles.toggleText, fairwayHit && styles.toggleTextOn]}>Fairway</Text>
           </Pressable>
         ) : null}
-        <Pressable
-          onPress={() => setGir((v) => !v)}
-          style={[styles.toggle, gir && styles.toggleOn]}
-        >
+        <Pressable onPress={toggleGir} style={[styles.toggle, gir && styles.toggleOn]}>
           <Text style={[styles.toggleText, gir && styles.toggleTextOn]}>GIR</Text>
         </Pressable>
       </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      <Pressable
-        onPress={handleSave}
-        disabled={saving}
-        style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-      >
-        <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
-      </Pressable>
     </View>
   );
 }
@@ -191,11 +187,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: space[3],
-  },
+  heroRow: { flexDirection: 'row', alignItems: 'stretch', gap: space[3] },
   heroBtn: {
     width: 64,
     borderRadius: radius.md,
@@ -205,13 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroBtnText: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: colors.text,
-    lineHeight: 36,
-    includeFontPadding: false,
-  },
+  heroBtnText: { fontSize: 32, fontWeight: '300', color: colors.text, lineHeight: 36, includeFontPadding: false },
   heroCenter: {
     flex: 1,
     borderRadius: radius.md,
@@ -220,27 +206,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space[1],
   },
-  heroScore: {
-    fontSize: 52,
-    fontWeight: '700',
-    lineHeight: 56,
-    fontVariant: ['tabular-nums'],
-  },
-  heroLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 16,
-  },
+  heroScore: { fontSize: 52, fontWeight: '700', lineHeight: 56, fontVariant: ['tabular-nums'] },
+  heroLabel: { fontSize: 13, fontWeight: '600', lineHeight: 16 },
 
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.outlineVariant,
-  },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant },
 
-  toggleRow: {
-    flexDirection: 'row',
-    gap: space[3],
-  },
+  toggleRow: { flexDirection: 'row', gap: space[3] },
   toggle: {
     flex: 1,
     height: 44,
@@ -251,22 +222,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleOn: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primary,
-  },
+  toggleOn: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
   toggleText: { ...typography.labelM, color: colors.textMuted },
   toggleTextOn: { color: colors.onPrimaryContainer, fontWeight: '700' },
-
-  errorText: { ...typography.bodyS, color: colors.error },
-
-  saveBtn: {
-    paddingVertical: 15,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 });

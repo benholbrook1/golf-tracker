@@ -108,8 +108,6 @@ function RoundPlayInner() {
   const onSave = async (data: HoleScoreInput) => {
     if (!resolved) return;
     await saveHole(resolved.rn.id, resolved.courseHole.id, resolved.holeNumberWithinNine, data);
-    if (holeNumberGlobal < maxGlobal) setHoleNumberGlobal((h) => h + 1);
-    else setMode('summary');
   };
 
   if (loading) {

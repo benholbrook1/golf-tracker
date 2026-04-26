@@ -1,7 +1,7 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Themed';
-import { getScoreLabel, scoreColors } from '@/constants/golf';
+import { scoreColors } from '@/constants/golf';
 import { colors, radius, space, typography } from '@/theme/tokens';
 
 type Row = {
@@ -10,97 +10,153 @@ type Row = {
   strokes: number | null;
 };
 
-export function ScoreCard({ rows }: { rows: Row[] }) {
-  return (
-    <View style={styles.table}>
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.cell, styles.cellHole, styles.headerText]}>Hole</Text>
-        <Text style={[styles.cell, styles.cellPar, styles.headerText]}>Par</Text>
-        <Text style={[styles.cell, styles.cellScore, styles.headerText]}>Score</Text>
-        <Text style={[styles.cell, styles.cellLabel, styles.headerText]}>Result</Text>
-      </View>
+// ── Cell sizing ───────────────────────────────────────────────────────────────
+// Cells flex to fill the row — no fixed column width needed
 
-      {rows.map((r, i) => {
-        const sc = r.strokes != null ? scoreColors(r.strokes, r.par) : null;
-        const even = i % 2 === 0;
-        return (
-          <View
-            key={r.globalHole}
-            style={[styles.bodyRow, even ? styles.rowEven : styles.rowOdd]}
-          >
-            <Text style={[styles.cell, styles.cellHole, styles.bodyText]}>{r.globalHole}</Text>
-            <Text style={[styles.cell, styles.cellPar, styles.bodyText]}>{r.par}</Text>
-            <View style={styles.cellScore}>
-              {r.strokes != null && sc ? (
-                <View style={[styles.badge, { backgroundColor: sc.bg, borderColor: sc.border ?? 'transparent' }]}>
-                  <Text style={[styles.badgeText, { color: sc.text }]}>{r.strokes}</Text>
-                </View>
-              ) : (
-                <Text style={[styles.cell, styles.bodyText, { color: colors.textDisabled }]}>—</Text>
-              )}
+function NineGrid({
+  holes,
+  onHolePress,
+}: {
+  holes: Row[];
+  onHolePress?: (globalHole: number) => void;
+}) {
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      <View>
+        {/* ── Hole number row ── */}
+        <View style={[grid.row, grid.headerRow]}>
+          {holes.map((h) => (
+            <View key={h.globalHole} style={grid.cell}>
+              <Text style={grid.holeNum}>{h.globalHole}</Text>
             </View>
-            <Text style={[styles.cell, styles.cellLabel, styles.bodyText, { color: sc ? undefined : colors.textDisabled }]}>
-              {r.strokes == null ? '—' : getScoreLabel(r.strokes, r.par)}
-            </Text>
-          </View>
-        );
-      })}
+          ))}
+        </View>
+
+        {/* ── Par row ── */}
+        <View style={[grid.row, grid.parRow]}>
+          {holes.map((h) => (
+            <View key={h.globalHole} style={grid.cell}>
+              <Text style={grid.parVal}>{h.par}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Score row ── */}
+        <View style={[grid.row, grid.scoreRow]}>
+          {holes.map((h) => {
+            const sc = h.strokes != null ? scoreColors(h.strokes, h.par) : null;
+            return (
+              <Pressable
+                key={h.globalHole}
+                style={({ pressed }) => [grid.cell, pressed && grid.cellPressed]}
+                onPress={() => onHolePress?.(h.globalHole)}
+                disabled={!onHolePress}
+              >
+                {sc ? (
+                  <View
+                    style={[
+                      grid.badge,
+                      { backgroundColor: sc.bg, borderColor: sc.border ?? 'transparent' },
+                    ]}
+                  >
+                    <Text style={[grid.badgeText, { color: sc.text }]}>{h.strokes}</Text>
+                  </View>
+                ) : (
+                  <Text style={grid.emptyVal}>—</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  table: {
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  headerRow: {
+const grid = StyleSheet.create({
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceContainer,
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    gap: space[2],
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.outlineVariant,
-  },
-  bodyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 44,
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    gap: space[2],
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.outlineVariant,
   },
-  rowEven: { backgroundColor: colors.surfaceBright },
-  rowOdd: { backgroundColor: colors.surface },
+  headerRow: {
+    backgroundColor: colors.surfaceContainer,
+    borderTopWidth: 0,
+  },
+  parRow: { backgroundColor: colors.surfaceBright },
+  scoreRow: { backgroundColor: colors.surfaceBright },
 
-  cell: { },
-  cellHole: { width: 40 },
-  cellPar: { width: 36 },
-  cellScore: { width: 52, alignItems: 'center' },
-  cellLabel: { flex: 1 },
-
-  headerText: { ...typography.labelS, color: colors.textMuted },
-  bodyText: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
+  cell: {
+    flex: 1,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellPressed: { opacity: 0.55 },
+  holeNum: { ...typography.labelS, color: colors.textMuted, fontVariant: ['tabular-nums'] },
+  parVal: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
+  emptyVal: { ...typography.labelM, color: colors.textDisabled },
 
   badge: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: radius.sm,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
+    lineHeight: 14,
     fontVariant: ['tabular-nums'],
-    lineHeight: 16,
+  },
+});
+
+// ── Main ScoreCard ────────────────────────────────────────────────────────────
+export function ScoreCard({
+  rows,
+  onHolePress,
+}: {
+  rows: Row[];
+  onHolePress?: (globalHole: number) => void;
+}) {
+  const front = rows
+    .filter((r) => r.globalHole <= 9)
+    .sort((a, b) => a.globalHole - b.globalHole);
+  const back = rows
+    .filter((r) => r.globalHole >= 10)
+    .sort((a, b) => a.globalHole - b.globalHole);
+
+  const isEighteen = back.length > 0;
+
+  return (
+    <View style={styles.card}>
+      <NineGrid holes={front} onHolePress={onHolePress} />
+      {isEighteen ? (
+        <>
+          <View style={styles.nineDivider} />
+          <NineGrid holes={back} onHolePress={onHolePress} />
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  nineDivider: {
+    height: 4,
+    backgroundColor: colors.surfaceContainer,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
   },
 });

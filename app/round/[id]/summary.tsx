@@ -140,21 +140,6 @@ function RoundSummaryInner() {
 
           {/* Action buttons */}
           <View style={styles.actions}>
-            <Pressable
-              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
-              onPress={() => router.push({ pathname: '/round/new', params: { courseId: round.courseId } })}
-            >
-              <FontAwesome name="plus" size={13} color={colors.primary} />
-              <RNText style={styles.secondaryBtnText}>New round at this course</RNText>
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
-              onPress={() => router.push('/two')}
-            >
-              <FontAwesome name="bar-chart" size={13} color={colors.primary} />
-              <RNText style={styles.secondaryBtnText}>View stats</RNText>
-            </Pressable>
 
             {!round.isComplete && !isAbandoned ? (
               <Pressable
@@ -244,20 +229,6 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 
   actions: { gap: space[3] },
-
-  secondaryBtn: {
-    paddingVertical: 13,
-    paddingHorizontal: space[4],
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryContainer,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-  },
-  secondaryBtnText: { fontSize: 15, fontWeight: '600', lineHeight: 22, color: colors.primary },
 
   ghostBtn: {
     paddingVertical: 13,

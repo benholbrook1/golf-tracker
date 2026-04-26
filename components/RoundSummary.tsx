@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { ScoreCard } from '@/components/ScoreCard';
@@ -52,16 +52,29 @@ export function RoundSummary({
   scoreRows,
   onEditHole,
 }: Props) {
-  const diff = totalScore - totalPar;
+  // Only count holes that have been scored for the diff calculation
+  const scoredRows = scoreRows.filter((r) => r.strokes != null);
+  const holesPlayed = scoredRows.length;
+  const totalHoles = scoreRows.length;
+  const isComplete = holesPlayed === totalHoles && totalHoles > 0;
+
+  const scoredPar = scoredRows.reduce((s, r) => s + r.par, 0);
+  const diff = totalScore - scoredPar;
   const diffLabel = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`;
+
+  const heroSub = isComplete
+    ? `vs par ${diffLabel}`
+    : holesPlayed === 0
+      ? 'No holes scored yet'
+      : `Through ${holesPlayed} of ${totalHoles} holes · ${diffLabel}`;
 
   return (
     <View style={styles.container}>
       {/* Score hero */}
       <View style={styles.hero}>
         <View style={styles.heroLeft}>
-          <Text style={styles.heroScore}>{totalScore}</Text>
-          <Text style={styles.heroSub}>vs par {diffLabel}</Text>
+          <Text style={styles.heroScore}>{holesPlayed === 0 ? '—' : totalScore}</Text>
+          <Text style={styles.heroSub}>{heroSub}</Text>
         </View>
         {differential != null ? (
           <View style={styles.heroDiff}>
@@ -79,23 +92,9 @@ export function RoundSummary({
         <StatCard label="Penalties" value={String(totalPenalties)} />
       </View>
 
-      {/* Scorecard */}
+      {/* Scorecard — tap a score to edit that hole */}
       <Text style={styles.sectionTitle}>Scorecard</Text>
-      <ScoreCard rows={scoreRows} />
-
-      {/* Edit holes quick access */}
-      <Text style={styles.sectionTitle}>Edit hole</Text>
-      <View style={styles.editGrid}>
-        {scoreRows.map((r) => (
-          <Pressable
-            key={r.globalHole}
-            style={({ pressed }) => [styles.editBtn, pressed && styles.editBtnPressed]}
-            onPress={() => onEditHole(r.globalHole)}
-          >
-            <Text style={styles.editBtnText}>{r.globalHole}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <ScoreCard rows={scoreRows} onHolePress={onEditHole} />
     </View>
   );
 }
@@ -133,18 +132,4 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: space[2] },
 
   sectionTitle: { ...typography.labelM, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  editGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  editBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceBright,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editBtnPressed: { backgroundColor: colors.surfaceContainer },
-  editBtnText: { ...typography.labelM, color: colors.text, fontVariant: ['tabular-nums'] },
 });
