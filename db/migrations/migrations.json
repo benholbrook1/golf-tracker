@@ -48,6 +48,24 @@
         "when": 1745700000000,
         "tag": "0007_hole_scores_penalties",
         "breakpoints": true
+      },
+      {
+        "idx": 8,
+        "when": 1745800000000,
+        "tag": "0008_nine_ratings",
+        "breakpoints": true
+      },
+      {
+        "idx": 9,
+        "when": 1745900000000,
+        "tag": "0009_nine_slope",
+        "breakpoints": true
+      },
+      {
+        "idx": 10,
+        "when": 1746000000000,
+        "tag": "0010_nine_handicap_diff",
+        "breakpoints": true
       }
     ]
   },
@@ -59,6 +77,9 @@
     "m0004": "-- Mark a round as abandoned/cancelled without deleting it.\n\nALTER TABLE `rounds` ADD `abandoned_at` text;\nCREATE INDEX `rounds_abandoned_at_idx` ON `rounds` (`abandoned_at`);\n",
     "m0005": "-- Store a stock image key for course cards.\n\nALTER TABLE `courses` ADD `image_key` text;\nCREATE INDEX `courses_image_key_idx` ON `courses` (`image_key`);\n",
     "m0006": "-- Reverted: tee offset columns removed from schema (never successfully applied).\nSELECT 1;\n",
-    "m0007": "-- Add penalties column to hole_scores (was in schema but never migrated).\nALTER TABLE hole_scores ADD COLUMN penalties INTEGER NOT NULL DEFAULT 0;\n"
+    "m0007": "-- Add penalties column to hole_scores (was in schema but never migrated).\nALTER TABLE hole_scores ADD COLUMN penalties INTEGER NOT NULL DEFAULT 0;\n",
+    "m0008": "-- Add 9-hole rating/slope to course_nines and nine_handicap_differential to rounds.\nALTER TABLE course_nines ADD COLUMN rating REAL;\n--> statement-breakpoint\nALTER TABLE course_nines ADD COLUMN slope INTEGER;\n--> statement-breakpoint\nALTER TABLE rounds ADD COLUMN nine_handicap_differential REAL;\n",
+    "m0009": "-- Add slope to course_nines (nine_ratings migration only executed the first statement).\nALTER TABLE course_nines ADD COLUMN slope INTEGER;\n",
+    "m0010": "-- Add nine_handicap_differential to rounds (nine_ratings migration only executed the first statement).\nALTER TABLE rounds ADD COLUMN nine_handicap_differential REAL;\n"
   }
 }

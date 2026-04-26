@@ -60,6 +60,8 @@ export default function CourseDetailScreen() {
   const [teeNameById, setTeeNameById] = useState<Record<string, string>>({});
   const [newTeeName, setNewTeeName] = useState('');
   const [nineNameById, setNineNameById] = useState<Record<string, string>>({});
+  const [nineRatingById, setNineRatingById] = useState<Record<string, string>>({});
+  const [nineSlopeById, setNineSlopeById] = useState<Record<string, string>>({});
   const [holeEdits, setHoleEdits] = useState<Record<string, HoleEdit>>({});
   const [comboEdits, setComboEdits] = useState<Record<string, ComboEdit>>({});
   const [newFrontId, setNewFrontId] = useState<string>('');
@@ -130,6 +132,15 @@ export default function CourseDetailScreen() {
       nines[n.id] = n.name;
     }
     setNineNameById(nines);
+
+    const nineRatings: Record<string, string> = {};
+    const nineSlopes: Record<string, string> = {};
+    for (const n of data.nines) {
+      nineRatings[n.id] = n.rating == null ? '' : String(n.rating);
+      nineSlopes[n.id] = n.slope == null ? '' : String(n.slope);
+    }
+    setNineRatingById(nineRatings);
+    setNineSlopeById(nineSlopes);
 
     const holes: Record<string, HoleEdit> = {};
     for (const n of data.nines) {
@@ -644,6 +655,28 @@ export default function CourseDetailScreen() {
     );
   };
 
+  const handleNineRating = (nineId: string, val: string) => {
+    setNineRatingById((m) => ({ ...m, [nineId]: val }));
+    const num = parseFloat(val);
+    if (val.trim() !== '' && isNaN(num)) return;
+    debounceSave(`nine_rating_${nineId}`, () =>
+      db.update(courseNines)
+        .set(withTimestamp({ rating: val.trim() === '' ? null : num }))
+        .where(eq(courseNines.id, nineId))
+    );
+  };
+
+  const handleNineSlope = (nineId: string, val: string) => {
+    setNineSlopeById((m) => ({ ...m, [nineId]: val }));
+    const num = parseInt(val, 10);
+    if (val.trim() !== '' && isNaN(num)) return;
+    debounceSave(`nine_slope_${nineId}`, () =>
+      db.update(courseNines)
+        .set(withTimestamp({ slope: val.trim() === '' ? null : num }))
+        .where(eq(courseNines.id, nineId))
+    );
+  };
+
   const handleTeeName = (teeId: string, val: string) => {
     setTeeNameById((m) => ({ ...m, [teeId]: val }));
     debounceSave(`tee_${teeId}`, () =>
@@ -1099,10 +1132,44 @@ export default function CourseDetailScreen() {
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustKeyboardInsets
         >
-          {data.nines.length < 2 ? (
-            <Text style={styles.muted}>You need at least two nines to create 18-hole configurations.</Text>
-          ) : (
+          {/* 9-hole ratings — always shown */}
+          <Text style={styles.sectionTitle}>9-hole ratings</Text>
+          <Text style={styles.hint}>Set a rating and slope per nine to enable 9-hole handicap differentials. Two completed 9-hole rounds are paired to form one 18-hole differential (USGA).</Text>
+
+          {data.nines.map((n) => (
+            <View key={n.id} style={styles.comboCard}>
+              <Text style={styles.comboMeta}>{nineNameById[n.id] ?? n.name}</Text>
+              <View style={styles.ratingRow}>
+                <View style={styles.ratingField}>
+                  <Text style={styles.fieldLabel}>Rating</Text>
+                  <TextInput
+                    style={styles.ratingInput}
+                    keyboardType="decimal-pad"
+                    value={nineRatingById[n.id] ?? ''}
+                    onChangeText={(v) => handleNineRating(n.id, v)}
+                    placeholder="35.5"
+                    placeholderTextColor={colors.textDisabled}
+                  />
+                </View>
+                <View style={styles.ratingField}>
+                  <Text style={styles.fieldLabel}>Slope</Text>
+                  <TextInput
+                    style={styles.ratingInput}
+                    keyboardType="number-pad"
+                    value={nineSlopeById[n.id] ?? ''}
+                    onChangeText={(v) => handleNineSlope(n.id, v)}
+                    placeholder="118"
+                    placeholderTextColor={colors.textDisabled}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {/* 18-hole configurations — only when 2+ nines */}
+          {data.nines.length >= 2 ? (
             <>
+              <View style={styles.divider} />
               <Text style={styles.sectionTitle}>18-hole configurations</Text>
               <Text style={styles.hint}>Named layouts for full rounds. Rating and slope are used for handicap differentials.</Text>
 
@@ -1223,7 +1290,7 @@ export default function CourseDetailScreen() {
                 <Text style={styles.muted}>All possible configurations are already saved.</Text>
               )}
             </>
-          )}
+          ) : null}
         </ScrollView>
       ) : null}
     </View>

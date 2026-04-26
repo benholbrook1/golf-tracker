@@ -24,6 +24,8 @@ export type StatsSnapshot = {
   fairwayPct: number | null;
   scoreTrend: Array<{ roundId: string; date: string; totalScore: number }>;
   puttsTrend: Array<{ roundId: string; date: string; avgPutts: number }>;
+  girTrend: Array<{ roundId: string; date: string; girPct: number }>;
+  fairwayTrend: Array<{ roundId: string; date: string; fairwayPct: number }>;
   avgPuttsByHole: Array<{ hole: number; avgPutts: number }>;
 };
 
@@ -107,12 +109,17 @@ export function useStats(): {
       const fairwayPct =
         fairwayEligible.length > 0 ? (fairwayHits / fairwayEligible.length) * 100 : null;
 
-      const totalsByRound = new Map<string, { date: string; strokes: number; putts: number; holes: number }>();
+      const totalsByRound = new Map<string, { date: string; strokes: number; putts: number; holes: number; girHits: number; fwHits: number; fwEligible: number }>();
       for (const h of holeRows) {
-        const cur = totalsByRound.get(h.roundId) ?? { date: h.roundDate, strokes: 0, putts: 0, holes: 0 };
+        const cur = totalsByRound.get(h.roundId) ?? { date: h.roundDate, strokes: 0, putts: 0, holes: 0, girHits: 0, fwHits: 0, fwEligible: 0 };
         cur.strokes += h.strokes;
         cur.putts += h.putts;
         cur.holes += 1;
+        cur.girHits += h.gir ? 1 : 0;
+        if (h.par !== 3) {
+          cur.fwHits += h.fairwayHit ? 1 : 0;
+          cur.fwEligible += 1;
+        }
         totalsByRound.set(h.roundId, cur);
       }
 
@@ -137,6 +144,26 @@ export function useStats(): {
 
       puttsTrend.sort((a, b) => a.date.localeCompare(b.date));
 
+      const girTrend = roundsSeen
+        .map((id) => {
+          const t = totalsByRound.get(id);
+          if (!t || t.holes === 0) return null;
+          return { roundId: id, date: t.date, girPct: (t.girHits / t.holes) * 100 };
+        })
+        .filter(Boolean) as Array<{ roundId: string; date: string; girPct: number }>;
+
+      girTrend.sort((a, b) => a.date.localeCompare(b.date));
+
+      const fairwayTrend = roundsSeen
+        .map((id) => {
+          const t = totalsByRound.get(id);
+          if (!t || t.fwEligible === 0) return null;
+          return { roundId: id, date: t.date, fairwayPct: (t.fwHits / t.fwEligible) * 100 };
+        })
+        .filter(Boolean) as Array<{ roundId: string; date: string; fairwayPct: number }>;
+
+      fairwayTrend.sort((a, b) => a.date.localeCompare(b.date));
+
       const byGlobalHole = new Map<number, { sum: number; n: number }>();
       for (const h of trendRows) {
         const globalHole = (h.nineOrder - 1) * 9 + h.holeNumberWithinNine;
@@ -158,6 +185,8 @@ export function useStats(): {
         fairwayPct,
         scoreTrend,
         puttsTrend,
+        girTrend,
+        fairwayTrend,
         avgPuttsByHole,
       });
       setLoading(false);

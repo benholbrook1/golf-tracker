@@ -1,12 +1,41 @@
 import { useCallback, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HandicapBadge } from '@/components/HandicapBadge';
 import { Text } from '@/components/Themed';
 import { useStats } from '@/hooks/useStats';
+import { colors, radius, space, typography } from '@/theme/tokens';
 
+// ── Metric card ───────────────────────────────────────────────────────────────
+function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <View style={mStyles.card}>
+      <RNText style={mStyles.label}>{label}</RNText>
+      <RNText style={mStyles.value}>{value}</RNText>
+      {hint ? <RNText style={mStyles.hint}>{hint}</RNText> : null}
+    </View>
+  );
+}
+
+const mStyles = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[3],
+    gap: space[1],
+  },
+  label: { fontSize: 12, fontWeight: '500', lineHeight: 16, color: colors.textMuted },
+  value: { fontSize: 22, fontWeight: '700', lineHeight: 28, color: colors.text, fontVariant: ['tabular-nums'] },
+  hint:  { fontSize: 11, fontWeight: '400', lineHeight: 15, color: colors.textDisabled },
+});
+
+// ── Spark bar chart ───────────────────────────────────────────────────────────
 function SparkBars({
   title,
   points,
@@ -17,20 +46,22 @@ function SparkBars({
   valueLabel: (v: number) => string;
 }) {
   const max = useMemo(() => points.reduce((m, p) => Math.max(m, p.value), 0), [points]);
+
+  if (points.length === 0) return null;
+
   return (
-    <View style={cardStyles.card}>
-      <Text style={cardStyles.cardTitle}>{title}</Text>
-      {points.length === 0 ? <Text style={cardStyles.muted}>Not enough completed rounds yet.</Text> : null}
-      <View style={cardStyles.chart}>
+    <View style={bStyles.card}>
+      <RNText style={bStyles.title}>{title}</RNText>
+      <View style={bStyles.chart}>
         {points.map((p) => {
           const widthPct = max <= 0 ? 0 : Math.round((p.value / max) * 100);
           return (
-            <View key={p.key} style={cardStyles.barRow}>
-              <Text style={cardStyles.barLabel}>{p.label}</Text>
-              <View style={cardStyles.barTrack}>
-                <View style={[cardStyles.barFill, { width: `${widthPct}%` }]} />
+            <View key={p.key} style={bStyles.barRow}>
+              <RNText style={bStyles.barLabel}>{p.label}</RNText>
+              <View style={bStyles.barTrack}>
+                <View style={[bStyles.barFill, { width: `${widthPct}%` }]} />
               </View>
-              <Text style={cardStyles.barValue}>{valueLabel(p.value)}</Text>
+              <RNText style={bStyles.barValue}>{valueLabel(p.value)}</RNText>
             </View>
           );
         })}
@@ -39,241 +70,207 @@ function SparkBars({
   );
 }
 
+const bStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[4],
+    gap: space[3],
+  },
+  title: { fontSize: 14, fontWeight: '600', lineHeight: 20, color: colors.text },
+  chart: { gap: space[2] },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  barLabel: { width: 48, fontSize: 12, fontWeight: '500', lineHeight: 16, color: colors.textMuted },
+  barTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceContainer,
+    overflow: 'hidden',
+  },
+  barFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
+  barValue: { width: 44, textAlign: 'right', fontSize: 12, fontWeight: '600', lineHeight: 16, color: colors.text, fontVariant: ['tabular-nums'] },
+});
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function TabTwoScreen() {
+  const insets = useSafeAreaInsets();
   const { stats, loading, error, refresh } = useStats();
 
   useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh])
+    useCallback(() => { void refresh(); }, [refresh])
   );
 
   const scorePoints = useMemo(() => {
     if (!stats) return [];
     return stats.scoreTrend.map((r) => ({
       key: r.roundId,
-      label: r.date.slice(5), // MM-DD (compact)
+      label: r.date.slice(5).replace('-', '/'),
       value: r.totalScore,
     }));
   }, [stats]);
 
-  const puttRoundPoints = useMemo(() => {
+  const puttPoints = useMemo(() => {
     if (!stats) return [];
     return stats.puttsTrend.map((r) => ({
       key: r.roundId,
-      label: r.date.slice(5),
+      label: r.date.slice(5).replace('-', '/'),
       value: r.avgPutts,
     }));
   }, [stats]);
 
+  const girPoints = useMemo(() => {
+    if (!stats) return [];
+    return stats.girTrend.map((r) => ({
+      key: r.roundId,
+      label: r.date.slice(5).replace('-', '/'),
+      value: r.girPct,
+    }));
+  }, [stats]);
+
+  const fairwayPoints = useMemo(() => {
+    if (!stats) return [];
+    return stats.fairwayTrend.map((r) => ({
+      key: r.roundId,
+      label: r.date.slice(5).replace('-', '/'),
+      value: r.fairwayPct,
+    }));
+  }, [stats]);
+
+  const noData = !loading && stats != null && stats.roundsAnalyzed === 0;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Stats</Text>
-        <Pressable onPress={refresh} style={styles.refresh} disabled={loading}>
-          <Text style={styles.refreshText}>{loading ? '…' : '↻'}</Text>
-        </Pressable>
-      </View>
-
-      {error ? <Text style={styles.error}>Error: {error}</Text> : null}
-
-      {!loading && stats && stats.roundsAnalyzed === 0 ? (
-        <View style={styles.emptyCta}>
-          <Text style={styles.emptyCtaText}>
-            Finish at least one complete round to unlock trends. For a handicap index (est.), you need several completed 18-hole
-            rounds with a rated layout.
-          </Text>
-          <Link href="/round/new" asChild>
-            <Pressable style={styles.emptyCtaBtn}>
-              <Text style={styles.emptyCtaBtnText}>Start a round</Text>
-            </Pressable>
-          </Link>
-        </View>
-      ) : null}
-
-      <HandicapBadge />
-
-      <View style={styles.metricsRow}>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Avg putts / hole</Text>
-          <Text style={styles.metricValue}>
-            {stats?.avgPuttsPerHole == null ? '—' : stats.avgPuttsPerHole.toFixed(2)}
-          </Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>GIR%</Text>
-          <Text style={styles.metricValue}>{stats?.girPct == null ? '—' : `${Math.round(stats.girPct)}%`}</Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>FW%</Text>
-          <Text style={styles.metricValue}>
-            {stats?.fairwayPct == null ? '—' : `${Math.round(stats.fairwayPct)}%`}
-          </Text>
-          <Text style={styles.metricHint}>Par 3 excluded</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionHint}>
-        Trends use your most recent {stats?.scoreTrend.length ?? 0} completed rounds (max 10).
-      </Text>
-
-      <SparkBars title="Score trend" points={scorePoints} valueLabel={(v) => `${Math.round(v)}`} />
-      <SparkBars title="Avg putts / round" points={puttRoundPoints} valueLabel={(v) => v.toFixed(2)} />
-
-      <View style={cardStyles.card}>
-        <Text style={cardStyles.cardTitle}>Avg putts by hole (trend rounds)</Text>
-        {stats && stats.avgPuttsByHole.length === 0 ? (
-          <Text style={cardStyles.muted}>Not enough data.</Text>
+    <View style={styles.screen}>
+      {/* Fixed header */}
+      <View style={[styles.header, { paddingTop: insets.top + space[3] }]}>
+        <RNText style={styles.headerTitle}>Stats</RNText>
+        {stats && stats.roundsAnalyzed > 0 ? (
+          <RNText style={styles.headerSub}>
+            {stats.roundsAnalyzed} complete round{stats.roundsAnalyzed !== 1 ? 's' : ''}
+          </RNText>
         ) : null}
-        <View style={styles.holeGrid}>
-          {(stats?.avgPuttsByHole ?? []).map((h) => (
-            <View key={h.hole} style={styles.holeCell}>
-              <Text style={styles.holeCellTop}>#{h.hole}</Text>
-              <Text style={styles.holeCellBottom}>{h.avgPutts.toFixed(1)}</Text>
-            </View>
-          ))}
-        </View>
       </View>
-    </ScrollView>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[8] }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {error ? (
+          <Text style={styles.errorText}>Error: {error}</Text>
+        ) : null}
+
+        {/* Handicap hero */}
+        <HandicapBadge />
+
+        {/* Empty state */}
+        {noData ? (
+          <View style={styles.emptyCard}>
+            <RNText style={styles.emptyText}>
+              Complete at least one 18-hole round to see trends. A handicap index requires 3+ rated rounds.
+            </RNText>
+            <Pressable style={styles.emptyBtn} onPress={() => router.push('/round/new')}>
+              <RNText style={styles.emptyBtnText}>Start a round</RNText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Key metrics */}
+        {stats && stats.roundsAnalyzed > 0 ? (
+          <View style={styles.metricsRow}>
+            <MetricCard
+              label="Avg putts / hole"
+              value={stats.avgPuttsPerHole == null ? '—' : stats.avgPuttsPerHole.toFixed(2)}
+            />
+            <MetricCard
+              label="GIR"
+              value={stats.girPct == null ? '—' : `${Math.round(stats.girPct)}%`}
+            />
+            <MetricCard
+              label="Fairway"
+              value={stats.fairwayPct == null ? '—' : `${Math.round(stats.fairwayPct)}%`}
+              hint="Par 3 excluded"
+            />
+          </View>
+        ) : null}
+
+        {/* Trends */}
+        {scorePoints.length > 0 ? (
+          <SparkBars
+            title={`Score trend · last ${scorePoints.length} rounds`}
+            points={scorePoints}
+            valueLabel={(v) => String(Math.round(v))}
+          />
+        ) : null}
+
+        {puttPoints.length > 0 ? (
+          <SparkBars
+            title={`Avg putts / hole · last ${puttPoints.length} rounds`}
+            points={puttPoints}
+            valueLabel={(v) => v.toFixed(2)}
+          />
+        ) : null}
+
+        {girPoints.length > 0 ? (
+          <SparkBars
+            title={`GIR% · last ${girPoints.length} rounds`}
+            points={girPoints}
+            valueLabel={(v) => `${Math.round(v)}%`}
+          />
+        ) : null}
+
+        {fairwayPoints.length > 0 ? (
+          <SparkBars
+            title={`Fairway% · last ${fairwayPoints.length} rounds`}
+            points={fairwayPoints}
+            valueLabel={(v) => `${Math.round(v)}%`}
+          />
+        ) : null}
+
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  refresh: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#999',
-  },
-  refreshText: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  metric: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#999',
-    gap: 4,
-  },
-  metricLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    opacity: 0.75,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  metricHint: {
-    fontSize: 11,
-    fontWeight: '700',
-    opacity: 0.65,
-  },
-  sectionHint: {
-    opacity: 0.75,
-    fontWeight: '600',
-  },
-  holeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  holeCell: {
-    width: '22%',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#999',
-    alignItems: 'center',
+  screen: { flex: 1, backgroundColor: colors.surface },
+
+  header: {
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    paddingHorizontal: space[4],
+    paddingBottom: space[3],
     gap: 2,
   },
-  holeCellTop: {
-    fontSize: 12,
-    fontWeight: '900',
-    opacity: 0.75,
-  },
-  holeCellBottom: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  error: {
-    color: '#c62828',
-    fontWeight: '700',
-  },
-  emptyCta: { padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#2f80ed', gap: 10 },
-  emptyCtaText: { fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: 0.9 },
-  emptyCtaBtn: { alignSelf: 'flex-start', backgroundColor: '#2f80ed', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
-  emptyCtaBtnText: { color: 'white', fontWeight: '800' },
-});
+  headerTitle: { fontSize: 28, fontWeight: '700', lineHeight: 34, color: colors.text },
+  headerSub: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.textMuted },
 
-const cardStyles = StyleSheet.create({
-  card: {
-    padding: 14,
-    borderRadius: 16,
+  scroll: { flex: 1 },
+  content: { padding: space[4], gap: space[4] },
+
+  errorText: { ...typography.bodyS, color: colors.error },
+
+  metricsRow: { flexDirection: 'row', gap: space[3] },
+
+  emptyCard: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#999',
-    gap: 8,
+    borderColor: colors.outlineVariant,
+    padding: space[4],
+    gap: space[3],
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '900',
+  emptyText: { fontSize: 14, fontWeight: '400', lineHeight: 21, color: colors.textMuted },
+  emptyBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    paddingVertical: space[2],
+    paddingHorizontal: space[4],
+    borderRadius: radius.md,
   },
-  muted: {
-    opacity: 0.75,
-    fontWeight: '600',
-  },
-  chart: {
-    gap: 10,
-    marginTop: 6,
-  },
-  barRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  barLabel: {
-    width: 54,
-    fontSize: 12,
-    fontWeight: '800',
-    opacity: 0.8,
-  },
-  barTrack: {
-    flex: 1,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#2f80ed',
-  },
-  barValue: {
-    width: 52,
-    textAlign: 'right',
-    fontSize: 12,
-    fontWeight: '900',
-  },
+  emptyBtnText: { fontSize: 14, fontWeight: '600', lineHeight: 20, color: colors.onPrimary },
+
 });

@@ -110,6 +110,19 @@ function RoundPlayInner() {
     await saveHole(resolved.rn.id, resolved.courseHole.id, resolved.holeNumberWithinNine, data);
   };
 
+  // Ensure the current hole is saved before navigating away (handles the case where
+  // the user never interacted with any control so auto-save never fired).
+  const saveCurrentIfNeeded = async () => {
+    if (!resolved || resolved.existing) return;
+    await onSave({
+      strokes: resolved.courseHole.par,
+      putts: 2,
+      fairwayHit: false,
+      gir: false,
+      penalties: 0,
+    });
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
@@ -316,7 +329,7 @@ function RoundPlayInner() {
       {mode === 'score' ? (
         <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
           <Pressable
-            onPress={() => setHoleNumberGlobal((h) => Math.max(1, h - 1))}
+            onPress={async () => { await saveCurrentIfNeeded(); setHoleNumberGlobal((h) => Math.max(1, h - 1)); }}
             disabled={holeNumberGlobal <= 1}
             style={[styles.navBtn, holeNumberGlobal <= 1 && styles.navBtnDisabled]}
           >
@@ -324,7 +337,8 @@ function RoundPlayInner() {
           </Pressable>
           <Text style={styles.navCenter}>{holeNumberGlobal} / {maxGlobal}</Text>
           <Pressable
-            onPress={() => {
+            onPress={async () => {
+              await saveCurrentIfNeeded();
               if (holeNumberGlobal < maxGlobal) setHoleNumberGlobal((h) => h + 1);
               else setMode('summary');
             }}

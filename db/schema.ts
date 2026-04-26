@@ -60,6 +60,10 @@ export const courseNines = sqliteTable(
       .notNull()
       .references(() => courses.id),
     name: text('name').notNull(),
+    /** 9-hole Course Rating for the default tee — enables 9-hole handicap differentials (USGA). */
+    rating: real('rating'),
+    /** 9-hole Slope Rating for the default tee (55–155, standard = 113). */
+    slope: integer('slope'),
     ...timestamps,
   },
   (t) => ({
@@ -162,6 +166,8 @@ export const rounds = sqliteTable(
     date: text('date').notNull(), // ISO-8601 date "YYYY-MM-DD"
     totalScore: integer('total_score').notNull().default(0),
     handicapDifferential: real('handicap_differential'),
+    /** Stored for 9-hole rounds that have a rated nine — two of these are combined for handicap. */
+    nineHandicapDifferential: real('nine_handicap_differential'),
     isComplete: integer('is_complete', { mode: 'boolean' }).notNull().default(false),
     abandonedAt: text('abandoned_at'),
     ...timestamps,
