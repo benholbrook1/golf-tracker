@@ -1,3 +1,4 @@
+import { resolveGeminiModelForRequest } from '@/utils/geminiModelSettings';
 import { ScorecardParseResult, ScorecardParseSchema } from '@/utils/validators';
 
 const SYSTEM_PROMPT = `You parse golf scorecard images. Return ONLY a JSON object — no markdown, no explanation, no code fences.
@@ -33,10 +34,6 @@ function getGeminiApiKey(): string | null {
   // NOTE: Any EXPO_PUBLIC_* value is bundled into the client. This is acceptable for a
   // personal dev phone MVP, but is NOT safe for App Store distribution.
   return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? null;
-}
-
-function getGeminiModel(): string {
-  return process.env.EXPO_PUBLIC_GEMINI_MODEL ?? 'gemini-1.5-flash';
 }
 
 function normalizeProxyPayload(data: unknown): unknown {
@@ -224,7 +221,7 @@ async function parseViaGeminiDirect(
     );
   }
 
-  const model = getGeminiModel();
+  const model = await resolveGeminiModelForRequest();
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
