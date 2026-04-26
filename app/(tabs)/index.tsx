@@ -1,33 +1,41 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Link } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { Text } from '@/components/Themed';
-import { Button, Card } from '@/components/ui';
-import { colors, space, typography } from '@/theme/tokens';
-import { HandicapEngine } from '@/utils/handicap';
-import { db } from '@/db/client';
-import { courses, holeScores, roundNines, rounds } from '@/db/schema';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
+import { db } from '@/db/client';
+import { courses, holeScores, roundNines, rounds } from '@/db/schema';
+import { HandicapEngine } from '@/utils/handicap';
+import { colors, radius, space, typography } from '@/theme/tokens';
+
+type LastRound = {
+  id: string;
+  date: string;
+  totalScore: number;
+  isComplete: boolean;
+  abandonedAt: string | null;
+  courseName: string;
+  putts: number | null;
+  girPct: number | null;
+};
+
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[(m ?? 1) - 1]} ${d}, ${y}`;
+}
+
 export default function HomeTab() {
+  const insets = useSafeAreaInsets();
   const [handicap, setHandicap] = useState<number | null>(null);
   const [handicapLoading, setHandicapLoading] = useState(true);
-  const [lastRound, setLastRound] = useState<{
-    id: string;
-    date: string;
-    totalScore: number;
-    isComplete: boolean;
-    abandonedAt: string | null;
-    courseId: string;
-    courseName: string;
-  } | null>(null);
-  const [lastRoundStats, setLastRoundStats] = useState<{ putts: number | null; girPct: number | null } | null>(null);
+  const [lastRound, setLastRound] = useState<LastRound | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setHandicapLoading(true);
+    setLoading(true);
     try {
       const [hcp, lr] = await Promise.all([
         HandicapEngine.getHandicapIndex(),
@@ -38,7 +46,6 @@ export default function HomeTab() {
             totalScore: rounds.totalScore,
             isComplete: rounds.isComplete,
             abandonedAt: rounds.abandonedAt,
-            courseId: rounds.courseId,
             courseName: courses.name,
           })
           .from(rounds)
@@ -48,229 +55,228 @@ export default function HomeTab() {
           .limit(1)
           .then((rows) => rows[0] ?? null),
       ]);
+
       setHandicap(hcp);
-      setLastRound(lr);
+      setHandicapLoading(false);
 
       if (lr) {
-        // Compute quick last-round stats (putts and GIR%).
         const scores = await db
           .select({ putts: holeScores.putts, gir: holeScores.gir })
           .from(holeScores)
           .innerJoin(roundNines, eq(holeScores.roundNineId, roundNines.id))
           .where(and(eq(roundNines.roundId, lr.id), isNull(holeScores.deletedAt), isNull(roundNines.deletedAt)));
-        const puttsTotal = scores.reduce((s, r) => s + (r.putts ?? 0), 0);
+        const putts = scores.length ? scores.reduce((s, r) => s + r.putts, 0) : null;
         const girs = scores.reduce((s, r) => s + (r.gir ? 1 : 0), 0);
         const girPct = scores.length ? (girs / scores.length) * 100 : null;
-        setLastRoundStats({ putts: scores.length ? puttsTotal : null, girPct });
+        setLastRound({ ...lr, putts, girPct });
       } else {
-        setLastRoundStats(null);
+        setLastRound(null);
       }
     } finally {
-      setHandicapLoading(false);
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useEffect(() => { void load(); }, [load]);
 
-  const handicapLabel = useMemo(() => {
-    if (handicapLoading) return '—';
-    if (handicap == null) return '—';
-    return handicap.toFixed(1);
-  }, [handicap, handicapLoading]);
+  const roundStatus = lastRound
+    ? lastRound.abandonedAt
+      ? 'abandoned'
+      : lastRound.isComplete
+        ? 'complete'
+        : 'in-progress'
+    : null;
+
+  const handicapText = handicapLoading
+    ? '—'
+    : handicap == null
+      ? 'No index yet'
+      : handicap.toFixed(1);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.brandRow}>
-          <Text style={styles.brand}>ParTracker</Text>
+    <View style={styles.screen}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + space[3] }]}>
+        <RNText style={styles.appName}>GolfLog</RNText>
+        <View style={styles.hcpBadge}>
+          <RNText style={styles.hcpLabel}>HCP</RNText>
+          <RNText style={styles.hcpValue}>{handicapText}</RNText>
         </View>
+      </View>
 
-        <View style={styles.welcomeBlock}>
-          <Text style={styles.welcomeTitle}>Welcome back</Text>
-          <Text style={styles.welcomeSub}>
-            {handicapLoading
-              ? 'Calculating your handicap…'
-              : handicap == null
-                ? 'Finish a few rated 18-hole rounds to unlock a handicap estimate.'
-                : `Handicap index: ${handicapLabel}`}
-          </Text>
-        </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[8] }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Primary CTA */}
+        <Pressable style={styles.startBtn} onPress={() => router.push('/round/new')}>
+          <RNText style={styles.startBtnText}>Start new round</RNText>
+        </Pressable>
 
-        <Link href="/round/new" asChild>
-          <View>
-            <View style={styles.primaryCta}>
-              <View style={styles.primaryCtaLeft}>
-                <View style={styles.primaryIcon}>
-                  <FontAwesome name="play" size={14} color={colors.onPrimary} />
+        {/* Last round */}
+        {!loading ? (
+          lastRound ? (
+            <View style={styles.card}>
+              {/* Status pill */}
+              <View style={styles.cardHeader}>
+                <RNText style={styles.cardLabel}>Last round</RNText>
+                <View style={[
+                  styles.statusPill,
+                  roundStatus === 'in-progress' && styles.statusPillActive,
+                  roundStatus === 'abandoned' && styles.statusPillAbandoned,
+                ]}>
+                  <RNText style={[
+                    styles.statusPillText,
+                    roundStatus === 'in-progress' && styles.statusPillTextActive,
+                    roundStatus === 'abandoned' && styles.statusPillTextAbandoned,
+                  ]}>
+                    {roundStatus === 'in-progress' ? 'In progress' : roundStatus === 'abandoned' ? 'Abandoned' : 'Complete'}
+                  </RNText>
                 </View>
-                <Text style={styles.primaryCtaText}>Start new round</Text>
               </View>
-              <FontAwesome name="chevron-right" size={16} color={colors.onPrimary} />
+
+              {/* Course + date */}
+              <View style={styles.courseRow}>
+                <RNText style={styles.courseName}>{lastRound.courseName}</RNText>
+                <RNText style={styles.courseDate}>{formatDate(lastRound.date)}</RNText>
+              </View>
+
+              {/* Stat row */}
+              <View style={styles.statRow}>
+                <View style={styles.statCell}>
+                  <RNText style={styles.statLabel}>Score</RNText>
+                  <RNText style={styles.statValue}>{lastRound.totalScore || '—'}</RNText>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCell}>
+                  <RNText style={styles.statLabel}>Putts</RNText>
+                  <RNText style={styles.statValue}>{lastRound.putts ?? '—'}</RNText>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCell}>
+                  <RNText style={styles.statLabel}>GIR</RNText>
+                  <RNText style={styles.statValue}>
+                    {lastRound.girPct == null ? '—' : `${Math.round(lastRound.girPct)}%`}
+                  </RNText>
+                </View>
+              </View>
+
+              {/* Action button */}
+              <Pressable
+                style={[styles.roundBtn, roundStatus === 'in-progress' && styles.roundBtnPrimary]}
+                onPress={() => router.push(`/round/${lastRound.id}/play?tab=${roundStatus === 'in-progress' ? 'score' : 'summary'}`)}
+              >
+                <RNText style={[styles.roundBtnText, roundStatus === 'in-progress' && styles.roundBtnTextPrimary]}>
+                  {roundStatus === 'in-progress' ? 'Resume round' : 'View round'}
+                </RNText>
+              </Pressable>
             </View>
-          </View>
-        </Link>
-
-        <Card>
-          <Text style={styles.sectionLabel}>Last round summary</Text>
-          {lastRound ? (
-            <>
-              <View style={styles.lastRoundHero}>
-                <View style={styles.lastRoundHeroOverlay} />
-                <View style={styles.lastRoundHeroInner}>
-                  <Text style={styles.lastRoundCourse}>{lastRound.courseName}</Text>
-                  <Text style={styles.lastRoundDate}>{lastRound.date}</Text>
-                </View>
-              </View>
-
-              <View style={styles.lastRoundGrid}>
-                <View style={styles.metricCell}>
-                  <Text style={styles.metricLabel}>Score</Text>
-                  <Text style={styles.metricValue}>{lastRound.totalScore}</Text>
-                </View>
-                <View style={styles.metricCell}>
-                  <Text style={styles.metricLabel}>Putts</Text>
-                  <Text style={styles.metricValue}>{lastRoundStats?.putts == null ? '—' : lastRoundStats.putts}</Text>
-                </View>
-                <View style={styles.metricCell}>
-                  <Text style={styles.metricLabel}>GIR</Text>
-                  <Text style={styles.metricValue}>
-                    {lastRoundStats?.girPct == null ? '—' : `${Math.round(lastRoundStats.girPct)}%`}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <Link href={`/round/${lastRound.id}/play?tab=summary`} asChild>
-                  <Button title="View" variant="secondary" />
-                </Link>
-                <Link href="/round/new" asChild>
-                  <Button title="Start new round" variant="primary" />
-                </Link>
-              </View>
-            </>
           ) : (
-            <>
-              <Text style={styles.cardBody}>No rounds yet. Start one to begin tracking.</Text>
-              <Link href="/round/new" asChild>
-                <Button title="Start new round" variant="primary" />
-              </Link>
-            </>
-          )}
-        </Card>
-
-        <View style={styles.keyPerfRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sectionLabel}>Key performance</Text>
-          </View>
-          <Link href="/two" asChild>
-            <Text style={styles.sectionLink}>View all stats</Text>
-          </Link>
-        </View>
-
-        <View style={styles.kpiGrid}>
-          <Card style={styles.kpiCard}>
-            <View style={styles.kpiIconCircle}>
-              <FontAwesome name="line-chart" size={16} color={colors.primary} />
+            <View style={styles.emptyCard}>
+              <RNText style={styles.emptyText}>No rounds yet. Start one to begin tracking your game.</RNText>
             </View>
-            <Text style={styles.kpiLabel}>Handicap index</Text>
-            <Text style={styles.kpiValue}>{handicapLabel}</Text>
-            <Text style={styles.kpiHint}>Updates as you complete rounds</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <View style={styles.kpiIconCircleSlate}>
-              <FontAwesome name="flag" size={16} color={colors.secondary} />
-            </View>
-            <Text style={styles.kpiLabel}>Courses</Text>
-            <Text style={styles.kpiValue}>Manage</Text>
-            <Link href="/courses" asChild>
-              <Text style={styles.kpiHintLink}>View courses</Text>
-            </Link>
-          </Card>
-        </View>
+          )
+        ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  container: { padding: space[4], gap: space[4], paddingBottom: 40 },
+  screen: { flex: 1, backgroundColor: colors.surface },
 
-  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: space[1] },
-  brand: { ...typography.headingM, color: colors.primary, letterSpacing: 0.4 },
-  welcomeBlock: { gap: space[1] },
-  welcomeTitle: { ...typography.headingXl, color: colors.text },
-  welcomeSub: { ...typography.bodyS, color: colors.textMuted },
-
-  cardTitle: { ...typography.headingM, color: colors.text },
-  cardBody: { ...typography.bodyS, color: colors.textMuted },
-
-  row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-
-  primaryCta: {
-    minHeight: 56,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  header: {
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    paddingHorizontal: space[4],
+    paddingBottom: space[3],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  primaryCtaLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  primaryIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  appName: { fontSize: 22, fontWeight: '700', lineHeight: 28, color: colors.primary, letterSpacing: 0.3 },
+
+  hcpBadge: {
+    alignItems: 'flex-end',
+    gap: 1,
   },
-  primaryCtaText: { ...typography.labelM, color: colors.onPrimary, fontWeight: '600' },
+  hcpLabel: { fontSize: 11, fontWeight: '500', lineHeight: 15, color: colors.textDisabled, textTransform: 'uppercase', letterSpacing: 0.5 },
+  hcpValue: { fontSize: 20, fontWeight: '700', lineHeight: 25, color: colors.text, fontVariant: ['tabular-nums'] },
 
-  sectionLabel: { ...typography.labelS, color: colors.textMuted, letterSpacing: 0.6, textTransform: 'uppercase' },
-  sectionLink: { ...typography.labelS, color: colors.primary, fontWeight: '600' },
+  scroll: { flex: 1 },
+  content: { padding: space[4], gap: space[4] },
 
-  lastRoundHero: { height: 96, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.primaryContainer },
-  lastRoundHeroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.10)' },
-  lastRoundHeroInner: { flex: 1, padding: 14, justifyContent: 'flex-end' },
-  lastRoundCourse: { ...typography.headingM, color: colors.onPrimaryContainer },
-  lastRoundDate: { ...typography.bodyS, color: colors.onPrimaryContainer, opacity: 0.8 },
-  lastRoundGrid: {
+  startBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  startBtnText: { fontSize: 16, fontWeight: '600', lineHeight: 22, color: colors.onPrimary },
+
+  card: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
-    borderRadius: 12,
-    overflow: 'hidden',
-    flexDirection: 'row',
+    padding: space[4],
+    gap: space[3],
   },
-  metricCell: { flex: 1, padding: 12, gap: 4, backgroundColor: colors.surfaceBright },
-  metricLabel: { ...typography.labelS, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  metricValue: { fontSize: 22, fontWeight: '700', color: colors.text },
 
-  keyPerfRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  kpiGrid: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
-  kpiCard: { flex: 1, minWidth: 160 },
-  kpiIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
-    backgroundColor: colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kpiIconCircleSlate: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardLabel: { fontSize: 12, fontWeight: '500', lineHeight: 16, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
+
+  statusPill: {
+    paddingHorizontal: space[2],
+    paddingVertical: 3,
+    borderRadius: radius.full,
     backgroundColor: colors.surfaceContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
-  kpiLabel: { ...typography.labelS, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  kpiValue: { fontSize: 28, fontWeight: '700', color: colors.text },
-  kpiHint: { ...typography.bodyS, color: colors.textMuted },
-  kpiHintLink: { ...typography.bodyS, color: colors.primary, fontWeight: '600' },
+  statusPillActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+  statusPillAbandoned: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+  statusPillText: { fontSize: 11, fontWeight: '600', lineHeight: 15, color: colors.textMuted },
+  statusPillTextActive: { color: colors.primary },
+  statusPillTextAbandoned: { color: '#92400E' },
 
+  courseRow: { gap: 2 },
+  courseName: { fontSize: 18, fontWeight: '700', lineHeight: 24, color: colors.text },
+  courseDate: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.textMuted },
+
+  statRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  statCell: { flex: 1, paddingVertical: space[3], paddingHorizontal: space[2], alignItems: 'center', gap: 3, backgroundColor: colors.surface },
+  statDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant },
+  statLabel: { fontSize: 11, fontWeight: '500', lineHeight: 15, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontSize: 20, fontWeight: '700', lineHeight: 25, color: colors.text, fontVariant: ['tabular-nums'] },
+
+  roundBtn: {
+    paddingVertical: space[3],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: 'center',
+  },
+  roundBtnPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  roundBtnText: { fontSize: 14, fontWeight: '600', lineHeight: 20, color: colors.text },
+  roundBtnTextPrimary: { color: colors.onPrimary },
+
+  emptyCard: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[5],
+    alignItems: 'center',
+  },
+  emptyText: { fontSize: 14, fontWeight: '400', lineHeight: 21, color: colors.textMuted, textAlign: 'center' },
 });

@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
 import { confirmScorecardParse } from '@/hooks/useCourseImport';
 import { parseScorecardImage } from '@/utils/scorecardParser';
 import type { ScorecardParseResult } from '@/utils/validators';
 import { ScorecardParseSchema } from '@/utils/validators';
+import { colors, radius, space, typography } from '@/theme/tokens';
 
 type Step = 'pick' | 'parse' | 'review';
 
@@ -18,7 +19,21 @@ function mediaTypeFromPicker(t: string | undefined): 'image/jpeg' | 'image/png' 
   return 'image/jpeg';
 }
 
+const inputStyle = {
+  minHeight: 40,
+  backgroundColor: colors.surfaceContainer,
+  borderWidth: 1,
+  borderColor: colors.outlineVariant,
+  borderRadius: radius.md,
+  paddingHorizontal: space[3],
+  paddingVertical: space[2],
+  fontSize: 15,
+  fontWeight: '400' as const,
+  color: colors.text,
+};
+
 export default function CourseScanScreen() {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('pick');
   const [busy, setBusy] = useState(false);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
@@ -42,16 +57,10 @@ export default function CourseScanScreen() {
         Alert.alert('Permission needed', 'Please allow photo library access to scan a scorecard.');
         return;
       }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 1,
-      });
-
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (result.canceled) return;
       const asset = result.assets[0];
       if (!asset?.uri) return;
-
       setPickedUri(asset.uri);
       setPickedMime(mediaTypeFromPicker(asset.mimeType));
       parseStartedRef.current = false;
@@ -62,14 +71,10 @@ export default function CourseScanScreen() {
   };
 
   useEffect(() => {
-    if (step !== 'parse') return;
-    if (!pickedUri) return;
-    if (parseStartedRef.current) return;
+    if (step !== 'parse' || !pickedUri || parseStartedRef.current) return;
     parseStartedRef.current = true;
-
     let cancelled = false;
     setBusy(true);
-
     (async () => {
       try {
         const base64 = await new File(pickedUri).base64();
@@ -88,16 +93,12 @@ export default function CourseScanScreen() {
         if (!cancelled) setBusy(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [pickedMime, pickedUri, step]);
 
   const updateCourseName = (text: string) => {
     if (!parse) return;
-    const next = { ...parse, courseName: text };
-    setParse(next);
+    setParse({ ...parse, courseName: text });
   };
 
   const updatePar = (nineIdx: number, holeIdx: number, text: string) => {
@@ -133,13 +134,9 @@ export default function CourseScanScreen() {
     try {
       const checked = ScorecardParseSchema.safeParse(parse);
       if (!checked.success) {
-        Alert.alert(
-          'Invalid data',
-          'Check course name, pars (3–6), one yardage per tee column (0–2000 or empty), and handicap (1–18 or empty).'
-        );
+        Alert.alert('Invalid data', 'Check course name, pars (3–6), yardages (0–2000 or blank), and handicap (1–18 or blank).');
         return;
       }
-
       const { courseId } = await confirmScorecardParse(checked.data, { selectedTeeIndex });
       Alert.alert('Saved', 'Course created from scorecard.', [
         { text: 'OK', onPress: () => router.replace({ pathname: '/round/new', params: { courseId } }) },
@@ -151,253 +148,256 @@ export default function CourseScanScreen() {
     }
   };
 
+  const reset = () => {
+    setStep('pick');
+    setPickedUri(null);
+    setParse(null);
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Scan scorecard</Text>
-      <Text style={styles.subtitle}>
-        Parses using either `EXPO_PUBLIC_SCORECARD_LLM_PROXY_URL` (preferred) or a personal-phone MVP path with
-        `EXPO_PUBLIC_GEMINI_API_KEY` (+ optional `EXPO_PUBLIC_GEMINI_MODEL`). Nothing is written to SQLite until you confirm.
-      </Text>
-
-      {step === 'pick' ? (
-        <Pressable onPress={onPick} disabled={busy} style={[styles.primary, busy && styles.disabled]}>
-          <Text style={styles.primaryText}>{busy ? 'Working…' : 'Choose photo'}</Text>
+    <View style={styles.screen}>
+      {/* Fixed header */}
+      <View style={[styles.header, { paddingTop: insets.top + space[3] }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
+          <RNText style={styles.backBtnText}>← Back</RNText>
         </Pressable>
-      ) : null}
+        <RNText style={styles.headerTitle}>Scan scorecard</RNText>
+        <View style={styles.backBtn} />
+      </View>
 
-      {step === 'parse' ? (
-        <View style={styles.block}>
-          <Text style={styles.label}>Parsing…</Text>
-          <Text style={styles.mono}>{pickedUri}</Text>
-          <Pressable
-            onPress={() => {
-              setStep('pick');
-              setPickedUri(null);
-              setParse(null);
-            }}
-            style={styles.secondary}
-          >
-            <Text style={styles.secondaryText}>Start over</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {step === 'review' && parse ? (
-        <View style={styles.block}>
-          <Text style={styles.label}>Course name (saved to database)</Text>
-          <TextInput
-            value={parse.courseName}
-            onChangeText={updateCourseName}
-            style={styles.courseNameInput}
-            placeholder="Course name"
-            placeholderTextColor="#777"
-            autoCorrect
-            autoCapitalize="words"
-          />
-
-          <Text style={styles.label}>Tee set for this course</Text>
-          <Text style={styles.teeHelp}>
-            Parsed {parse.tees.length} column{parse.tees.length === 1 ? '' : 's'}. Choose which set to store as yardages when you play. You can still edit values below.
-          </Text>
-          <View style={styles.teeRow}>
-            {parse.tees.map((tee, i) => (
-              <Pressable
-                key={`${tee}-${i}`}
-                onPress={() => setSelectedTeeIndex(i)}
-                style={[styles.teeChip, i === selectedTeeIndex && styles.teeChipActive]}
-              >
-                <Text style={[styles.teeChipText, i === selectedTeeIndex && styles.teeChipTextActive]}>{tee}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {parse.nines.map((nine, nineIdx) => (
-            <View key={`${nine.name}-${nineIdx}`} style={styles.nine}>
-              <Text style={styles.nineTitle}>{nine.name}</Text>
-              {nine.holes.map((h, holeIdx) => (
-                <View key={h.holeNumber} style={styles.holeRow}>
-                  <Text style={styles.holeNo}>#{h.holeNumber}</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    value={String(h.par)}
-                    onChangeText={(t) => updatePar(nineIdx, holeIdx, t)}
-                    style={styles.input}
-                    placeholderTextColor="#777"
-                  />
-                  <TextInput
-                    placeholder={`Yards (${parse.tees[selectedTeeIndex] ?? 'tee'})`}
-                    keyboardType="number-pad"
-                    value={h.yardages[selectedTeeIndex] == null ? '' : String(h.yardages[selectedTeeIndex])}
-                    onChangeText={(t) => updateYardage(nineIdx, holeIdx, t)}
-                    style={styles.inputWide}
-                    placeholderTextColor="#777"
-                  />
-                  <TextInput
-                    placeholder="HI"
-                    keyboardType="number-pad"
-                    value={h.handicap == null ? '' : String(h.handicap)}
-                    onChangeText={(t) => updateHandicap(nineIdx, holeIdx, t)}
-                    style={styles.inputWide}
-                    placeholderTextColor="#777"
-                  />
-                </View>
-              ))}
-            </View>
-          ))}
-
-          <View style={styles.actions}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[8] }]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
+        {/* Pick step */}
+        {step === 'pick' ? (
+          <View style={styles.pickCard}>
+            <RNText style={styles.pickTitle}>Import from photo</RNText>
+            <RNText style={styles.pickBody}>
+              Choose a photo of a scorecard and we'll extract the hole layout automatically.
+            </RNText>
             <Pressable
-              onPress={() => {
-                setStep('parse');
-                setParse(null);
-              }}
-              style={styles.secondary}
+              onPress={onPick}
+              disabled={busy}
+              style={[styles.primaryBtn, styles.pickBtn, busy && styles.btnDisabled]}
             >
-              <Text style={styles.secondaryText}>Back</Text>
-            </Pressable>
-
-            <Pressable onPress={onConfirm} disabled={!canConfirm} style={[styles.primary, !canConfirm && styles.disabled]}>
-              <Text style={styles.primaryText}>{busy ? 'Saving…' : 'Confirm to database'}</Text>
+              <RNText style={styles.primaryBtnText}>{busy ? 'Working…' : 'Choose photo'}</RNText>
             </Pressable>
           </View>
-        </View>
-      ) : null}
-    </ScrollView>
+        ) : null}
+
+        {/* Parse step */}
+        {step === 'parse' ? (
+          <View style={styles.card}>
+            <RNText style={styles.cardTitle}>Analysing scorecard…</RNText>
+            <RNText style={styles.cardBody}>This may take a few seconds.</RNText>
+            <Pressable onPress={reset} style={styles.outlineBtn}>
+              <RNText style={styles.outlineBtnText}>Cancel</RNText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Review step */}
+        {step === 'review' && parse ? (
+          <>
+            {/* Course name */}
+            <View style={styles.card}>
+              <RNText style={styles.fieldLabel}>Course name</RNText>
+              <TextInput
+                value={parse.courseName}
+                onChangeText={updateCourseName}
+                style={styles.courseNameInput}
+                placeholder="Course name"
+                placeholderTextColor={colors.textDisabled}
+                autoCorrect
+                autoCapitalize="words"
+              />
+            </View>
+
+            {/* Tee selector */}
+            <View style={styles.card}>
+              <RNText style={styles.fieldLabel}>Tee set</RNText>
+              <RNText style={styles.cardBody}>
+                {parse.tees.length} column{parse.tees.length !== 1 ? 's' : ''} detected. Select which to import as yardages.
+              </RNText>
+              <View style={styles.chipRow}>
+                {parse.tees.map((tee, i) => (
+                  <Pressable
+                    key={`${tee}-${i}`}
+                    onPress={() => setSelectedTeeIndex(i)}
+                    style={[styles.chip, i === selectedTeeIndex && styles.chipOn]}
+                  >
+                    <RNText style={[styles.chipText, i === selectedTeeIndex && styles.chipTextOn]}>{tee}</RNText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Nines */}
+            {parse.nines.map((nine, nineIdx) => (
+              <View key={`${nine.name}-${nineIdx}`} style={styles.card}>
+                <RNText style={styles.cardTitle}>{nine.name}</RNText>
+
+                {/* Column headers */}
+                <View style={styles.holeRowHeader}>
+                  <RNText style={[styles.holeColLabel, styles.colHole]}>#</RNText>
+                  <RNText style={[styles.holeColLabel, styles.colPar]}>Par</RNText>
+                  <RNText style={[styles.holeColLabel, styles.colYards]}>
+                    Yards ({parse.tees[selectedTeeIndex] ?? '—'})
+                  </RNText>
+                  <RNText style={[styles.holeColLabel, styles.colHcp]}>HCP</RNText>
+                </View>
+
+                <View style={styles.divider} />
+
+                {nine.holes.map((h, holeIdx) => (
+                  <View key={h.holeNumber} style={styles.holeRow}>
+                    <RNText style={[styles.holeNum, styles.colHole]}>{h.holeNumber}</RNText>
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={String(h.par)}
+                      onChangeText={(t) => updatePar(nineIdx, holeIdx, t)}
+                      style={[styles.cellInput, styles.colPar]}
+                      placeholderTextColor={colors.textDisabled}
+                    />
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={h.yardages[selectedTeeIndex] == null ? '' : String(h.yardages[selectedTeeIndex])}
+                      onChangeText={(t) => updateYardage(nineIdx, holeIdx, t)}
+                      style={[styles.cellInput, styles.colYards]}
+                      placeholder="—"
+                      placeholderTextColor={colors.textDisabled}
+                    />
+                    <TextInput
+                      keyboardType="number-pad"
+                      value={h.handicap == null ? '' : String(h.handicap)}
+                      onChangeText={(t) => updateHandicap(nineIdx, holeIdx, t)}
+                      style={[styles.cellInput, styles.colHcp]}
+                      placeholder="—"
+                      placeholderTextColor={colors.textDisabled}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+
+            {/* Actions */}
+            <Pressable
+              onPress={onConfirm}
+              disabled={!canConfirm}
+              style={[styles.primaryBtn, !canConfirm && styles.btnDisabled]}
+            >
+              <RNText style={styles.primaryBtnText}>{busy ? 'Saving…' : 'Save course'}</RNText>
+            </Pressable>
+
+            <Pressable onPress={reset} style={styles.outlineBtn}>
+              <RNText style={styles.outlineBtnText}>Start over</RNText>
+            </Pressable>
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
+  screen: { flex: 1, backgroundColor: colors.surface },
+
+  header: {
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    paddingHorizontal: space[4],
+    paddingBottom: space[3],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
+  headerTitle: { ...typography.headingM, color: colors.text },
+  backBtn: { minWidth: 80 },
+  backBtnText: { ...typography.labelM, color: colors.primary, fontWeight: '600', lineHeight: 20 },
+
+  scroll: { flex: 1 },
+  content: { padding: space[4], gap: space[4] },
+
+  card: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[4],
+    gap: space[3],
   },
-  subtitle: {
-    opacity: 0.8,
-    fontWeight: '600',
+  cardTitle: { ...typography.headingM, color: colors.text },
+  cardBody: { ...typography.bodyS, color: colors.textMuted },
+  fieldLabel: { fontSize: 12, fontWeight: '500', lineHeight: 16, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  pickCard: {
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    padding: space[6],
+    gap: space[4],
+    alignItems: 'center',
   },
-  block: {
-    gap: 10,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '800',
-    opacity: 0.75,
-  },
-  mono: {
-    fontSize: 12,
-    fontWeight: '600',
-    opacity: 0.75,
-  },
+  pickTitle: { ...typography.headingM, color: colors.text },
+  pickBody: { ...typography.bodyS, color: colors.textMuted, textAlign: 'center', paddingHorizontal: space[2] },
+  pickBtn: { alignSelf: 'stretch', paddingHorizontal: space[6] },
+
   courseNameInput: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    ...inputStyle,
+    fontSize: 17,
+    fontWeight: '600' as const,
+    minHeight: 48,
+  },
+
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  chip: {
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: '#999',
-    fontSize: 18,
-    fontWeight: '800',
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainer,
   },
-  teeHelp: {
-    fontSize: 13,
-    fontWeight: '600',
-    opacity: 0.8,
-  },
-  teeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  teeChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#999',
-    backgroundColor: 'transparent',
-  },
-  teeChipActive: {
-    backgroundColor: '#2f80ed',
-    borderColor: '#2f80ed',
-  },
-  teeChipText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  teeChipTextActive: {
-    color: 'white',
-  },
-  nine: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#999',
-    gap: 8,
-  },
-  nineTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  holeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  holeNo: {
-    width: 34,
-    fontWeight: '900',
-  },
-  input: {
-    width: 52,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#999',
-    fontWeight: '800',
-  },
-  inputWide: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#999',
-    fontWeight: '700',
-  },
-  actions: {
-    marginTop: 12,
-    gap: 10,
-  },
-  primary: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#2f80ed',
+  chipOn: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+  chipText: { fontSize: 14, fontWeight: '600', lineHeight: 20, color: colors.text },
+  chipTextOn: { color: colors.primary },
+
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant },
+
+  holeRowHeader: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  holeColLabel: { fontSize: 11, fontWeight: '500', lineHeight: 15, color: colors.textDisabled, textTransform: 'uppercase' },
+
+  holeRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  holeNum: { fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.textMuted },
+
+  colHole: { width: 28, textAlign: 'center' },
+  colPar:  { width: 52 },
+  colYards: { flex: 1 },
+  colHcp:  { width: 52 },
+
+  cellInput: { ...inputStyle, textAlign: 'center' },
+
+  primaryBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: 15,
     alignItems: 'center',
   },
-  primaryText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondary: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+  primaryBtnText: { fontSize: 16, fontWeight: '600', lineHeight: 22, color: colors.onPrimary },
+
+  outlineBtn: {
+    borderRadius: radius.lg,
+    paddingVertical: 13,
     borderWidth: 1,
-    borderColor: '#999',
+    borderColor: colors.outlineVariant,
     alignItems: 'center',
   },
-  secondaryText: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  disabled: {
-    opacity: 0.55,
-  },
+  outlineBtnText: { fontSize: 15, fontWeight: '500', lineHeight: 20, color: colors.text },
+
+  btnDisabled: { opacity: 0.45 },
 });

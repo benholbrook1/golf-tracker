@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "golf-tracker",
-    "slug": "golf-tracker",
+    "name": "GolfLog",
+    "slug": "golflog",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

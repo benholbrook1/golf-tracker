@@ -8,7 +8,7 @@ export default function AboutModal() {
   const appVersion = Constants.expoConfig?.version ?? '—';
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ParTracker</Text>
+      <Text style={styles.title}>GolfLog</Text>
       <Text style={styles.body}>
         A local-first golf log: your rounds and courses stay in SQLite on this device. No account required in this build.
       </Text>
