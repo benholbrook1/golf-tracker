@@ -17,24 +17,22 @@ function Counter({
   value,
   onDec,
   onInc,
-  large,
 }: {
   label: string;
   value: number;
   onDec: () => void;
   onInc: () => void;
-  large?: boolean;
 }) {
   return (
     <View style={cStyles.counterRow}>
       <Text style={cStyles.counterLabel}>{label}</Text>
       <View style={cStyles.counterControls}>
-        <Pressable onPress={onDec} style={[cStyles.counterBtn, large && cStyles.counterBtnLarge]} hitSlop={6}>
-          <Text style={[cStyles.counterBtnText, large && cStyles.counterBtnTextLarge]}>−</Text>
+        <Pressable onPress={onDec} style={cStyles.counterBtn} hitSlop={6}>
+          <Text style={cStyles.counterBtnText}>−</Text>
         </Pressable>
-        <Text style={[cStyles.counterValue, large && cStyles.counterValueLarge]}>{value}</Text>
-        <Pressable onPress={onInc} style={[cStyles.counterBtn, large && cStyles.counterBtnLarge]} hitSlop={6}>
-          <Text style={[cStyles.counterBtnText, large && cStyles.counterBtnTextLarge]}>+</Text>
+        <Text style={cStyles.counterValue}>{value}</Text>
+        <Pressable onPress={onInc} style={cStyles.counterBtn} hitSlop={6}>
+          <Text style={cStyles.counterBtnText}>+</Text>
         </Pressable>
       </View>
     </View>
@@ -77,20 +75,29 @@ export function HoleEntry({ par, initial, onSave }: Props) {
 
   return (
     <View style={styles.card}>
-      {/* Score hero */}
-      <View style={[styles.hero, { backgroundColor: sc.bg, borderColor: sc.border ?? sc.bg }]}>
-        <Text style={[styles.heroScore, { color: sc.text }]}>{strokes}</Text>
-        <Text style={[styles.heroLabel, { color: sc.text, opacity: 0.85 }]}>{label}</Text>
-      </View>
+      {/* Score hero — dec/inc flank the coloured display */}
+      <View style={styles.heroRow}>
+        <Pressable
+          onPress={() => setStrokes((v) => Math.max(1, v - 1))}
+          style={styles.heroBtn}
+          hitSlop={8}
+        >
+          <Text style={styles.heroBtnText}>−</Text>
+        </Pressable>
 
-      {/* Strokes counter (large) */}
-      <Counter
-        label="Strokes"
-        value={strokes}
-        onDec={() => setStrokes((v) => Math.max(1, v - 1))}
-        onInc={() => setStrokes((v) => Math.min(20, v + 1))}
-        large
-      />
+        <View style={[styles.heroCenter, { backgroundColor: sc.bg, borderColor: sc.border ?? sc.bg }]}>
+          <Text style={[styles.heroScore, { color: sc.text }]}>{strokes}</Text>
+          <Text style={[styles.heroLabel, { color: sc.text }]}>{label}</Text>
+        </View>
+
+        <Pressable
+          onPress={() => setStrokes((v) => Math.min(20, v + 1))}
+          style={styles.heroBtn}
+          hitSlop={8}
+        >
+          <Text style={styles.heroBtnText}>+</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.divider} />
 
@@ -159,13 +166,7 @@ const cStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  counterBtnLarge: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-  },
   counterBtnText: { fontSize: 22, fontWeight: '600', color: colors.text, lineHeight: 26 },
-  counterBtnTextLarge: { fontSize: 28, lineHeight: 32 },
   counterValue: {
     width: 40,
     textAlign: 'center',
@@ -174,7 +175,6 @@ const cStyles = StyleSheet.create({
     color: colors.text,
     fontVariant: ['tabular-nums'],
   },
-  counterValueLarge: { fontSize: 28, width: 52 },
 });
 
 const styles = StyleSheet.create({
@@ -191,7 +191,29 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  hero: {
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: space[3],
+  },
+  heroBtn: {
+    width: 64,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroBtnText: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: colors.text,
+    lineHeight: 36,
+    includeFontPadding: false,
+  },
+  heroCenter: {
+    flex: 1,
     borderRadius: radius.md,
     borderWidth: 1,
     paddingVertical: space[4],
@@ -205,8 +227,9 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   heroLabel: {
-    ...typography.labelM,
+    fontSize: 13,
     fontWeight: '600',
+    lineHeight: 16,
   },
 
   divider: {
@@ -238,12 +261,12 @@ const styles = StyleSheet.create({
   errorText: { ...typography.bodyS, color: colors.error },
 
   saveBtn: {
-    height: 52,
+    paddingVertical: 15,
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 22, color: colors.onPrimary },
+  saveBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 });

@@ -18,12 +18,12 @@ export function getScoreLabel(strokes: number, par: number): string {
 /** Score colour coding per DESIGN.md §2.5 */
 export function scoreColors(strokes: number, par: number): { bg: string; text: string; border?: string } {
   const diff = strokes - par;
-  if (diff <= -2) return { bg: '#14532D', text: '#FFFFFF' };
-  if (diff === -1) return { bg: '#BBF7D0', text: '#14532D' };
-  if (diff === 0)  return { bg: '#F1F5F9', text: '#1E293B', border: '#94A3B8' };
-  if (diff === 1)  return { bg: '#FEF3C7', text: '#92400E' };
-  if (diff === 2)  return { bg: '#FEE2E2', text: '#991B1B' };
-  return           { bg: '#DC2626', text: '#FFFFFF' };
+  if (diff <= -2) return { bg: '#1B4332', text: '#D8F3DC' };              // Eagle   — deep muted green / soft mint
+  if (diff === -1) return { bg: '#D8F3DC', text: '#1B4332' };             // Birdie  — soft sage / deep green
+  if (diff === 0)  return { bg: '#F8FAFC', text: '#475569', border: '#CBD5E1' }; // Par — clean neutral
+  if (diff === 1)  return { bg: '#FFF8ED', text: '#92400E' };             // Bogey   — warm cream / amber
+  if (diff === 2)  return { bg: '#FFF0F0', text: '#991B1B' };             // Double  — soft blush / deep red
+  return                  { bg: '#FFE4E4', text: '#7F1D1D' };             // Triple+ — deeper blush / dark red
 }
 
 export const ESC_TABLE = [

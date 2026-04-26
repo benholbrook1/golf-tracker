@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
   hint: { ...typography.bodyS, color: colors.textMuted },
 
   createBtn: {
-    height: 52,
+    paddingVertical: 15,
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   createBtnDisabled: { opacity: 0.5 },
-  createBtnText: { ...typography.labelM, color: colors.onPrimary, fontWeight: '700', fontSize: 16 },
+  createBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 });

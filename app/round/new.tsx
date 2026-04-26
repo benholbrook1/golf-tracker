@@ -1,13 +1,16 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { Text } from '@/components/Themed';
 import { useCourses, useCourseDetail } from '@/hooks/useCourses';
 import { db } from '@/db/client';
 import { roundNines, rounds } from '@/db/schema';
+import { colors, radius, space, typography } from '@/theme/tokens';
 
 type Selection =
   | { type: 'combo'; comboId: string; frontNineId: string; backNineId: string; label: string }
@@ -20,7 +23,26 @@ function toLocalYMD(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function formatDateLabel(d: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.getTime() === today.getTime()) return 'Today';
+  if (d.getTime() === yesterday.getTime()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function NewRoundScreen() {
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <NewRoundInner />
+    </>
+  );
+}
+
+function NewRoundInner() {
   const { courseId: preselectCourseId } = useLocalSearchParams<{ courseId?: string }>();
   const { courses, loading, error, refresh } = useCourses();
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -45,10 +67,8 @@ export default function NewRoundScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-      if (selectedCourseId) {
-        refreshCourseDetail();
-      }
-    }, [refresh, selectedCourseId, refreshCourseDetail])
+      if (selectedCourseId) refreshCourseDetail();
+    }, [refresh, selectedCourseId, refreshCourseDetail]),
   );
 
   useEffect(() => {
@@ -60,7 +80,6 @@ export default function NewRoundScreen() {
   const selections = useMemo(() => {
     if (!courseDetail.data) return [];
     const { combos, nines } = courseDetail.data;
-
     const comboItems: Selection[] = combos.map((c) => ({
       type: 'combo',
       comboId: c.id,
@@ -68,13 +87,11 @@ export default function NewRoundScreen() {
       backNineId: c.backNineId,
       label: c.name,
     }));
-
     const nineItems: Selection[] = nines.map((n) => ({
       type: 'nine',
       nineId: n.id,
       label: n.name,
     }));
-
     return [...comboItems, ...nineItems];
   }, [courseDetail.data]);
 
@@ -86,43 +103,26 @@ export default function NewRoundScreen() {
       return;
     }
     if (creating) return;
-
     setCreating(true);
     try {
       if (selection.type === 'combo') {
         const inserted = await db
           .insert(rounds)
-          .values({
-            courseId: selectedCourseId,
-            comboId: selection.comboId,
-            teeId,
-            date: toLocalYMD(roundDate),
-            totalScore: 0,
-          })
+          .values({ courseId: selectedCourseId, comboId: selection.comboId, teeId, date: toLocalYMD(roundDate), totalScore: 0 })
           .returning();
-
         const round = inserted[0]!;
         await db.insert(roundNines).values([
           { roundId: round.id, nineId: selection.frontNineId, nineOrder: 1 },
           { roundId: round.id, nineId: selection.backNineId, nineOrder: 2 },
         ]);
-
         router.replace(`/round/${round.id}/play?hole=1`);
       } else {
         const inserted = await db
           .insert(rounds)
-          .values({
-            courseId: selectedCourseId,
-            comboId: null,
-            teeId,
-            date: toLocalYMD(roundDate),
-            totalScore: 0,
-          })
+          .values({ courseId: selectedCourseId, comboId: null, teeId, date: toLocalYMD(roundDate), totalScore: 0 })
           .returning();
-
         const round = inserted[0]!;
         await db.insert(roundNines).values([{ roundId: round.id, nineId: selection.nineId, nineOrder: 1 }]);
-
         router.replace(`/round/${round.id}/play?hole=1`);
       }
     } catch (e) {
@@ -132,216 +132,302 @@ export default function NewRoundScreen() {
     }
   };
 
+  const canStart = !!selectedCourseId && !!selection && !creating;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>New round</Text>
-      <Text style={styles.lede}>When and where you played, then the side or 18 you are scoring.</Text>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+          <FontAwesome name="chevron-left" size={16} color={colors.text} />
+        </Pressable>
+        <RNText style={styles.headerTitle}>New round</RNText>
+        <View style={styles.headerSpacer} />
+      </View>
 
-      {loading ? <Text>Loading courses…</Text> : null}
-      {error ? <Text style={styles.error}>Error: {error}</Text> : null}
-
-      <Text style={styles.sectionTitle}>Date</Text>
-      <Pressable
-        onPress={() => setShowDatePicker(true)}
-        style={styles.dateButton}
-        accessibilityRole="button"
-        accessibilityLabel="Choose round date"
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.dateButtonText}>{toLocalYMD(roundDate)}</Text>
-        <Text style={styles.dateHint}>{Platform.OS === 'android' ? 'Tap to change' : ''}</Text>
-      </Pressable>
-      {showDatePicker ? (
-        <DateTimePicker
-          value={roundDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(_, d) => {
-            if (Platform.OS === 'android') setShowDatePicker(false);
-            if (d) {
-              d.setHours(0, 0, 0, 0);
-              setRoundDate(d);
-            }
-          }}
-        />
-      ) : null}
-      <Pressable onPress={() => setShowDatePicker((s) => !s)}>
-        <Text style={styles.linkish}>{showDatePicker ? 'Hide' : 'Change date'}</Text>
-      </Pressable>
-
-      <Text style={styles.sectionTitle}>Course</Text>
-      <View style={styles.list}>
-        {courses.map((c) => (
+        {/* ── Date ── */}
+        <View style={styles.section}>
+          <RNText style={styles.sectionLabel}>Date</RNText>
           <Pressable
-            key={c.id}
-            onPress={() => {
-              setSelectedCourseId(c.id);
-              setSelection(null);
-            }}
-            style={[styles.item, selectedCourseId === c.id && styles.itemSelected]}
+            onPress={() => setShowDatePicker((s) => !s)}
+            style={({ pressed }) => [styles.dateBtn, pressed && styles.dateBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Choose round date"
           >
-            <Text style={styles.itemText}>{c.name}</Text>
+            <FontAwesome name="calendar" size={15} color={colors.textMuted} />
+            <RNText style={styles.dateBtnText}>{formatDateLabel(roundDate)}</RNText>
+            <RNText style={styles.dateBtnSub}>{toLocalYMD(roundDate)}</RNText>
           </Pressable>
-        ))}
-        {courses.length === 0 && !loading ? (
-          <View style={styles.emptyCourse}>
-            <Text style={styles.emptyCourseText}>Add a course first (scan a scorecard or create a default layout).</Text>
-            <View style={styles.emptyRow}>
-              <Link href="/course/scan" asChild>
-                <Pressable style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>Scan</Text>
+          {showDatePicker ? (
+            <DateTimePicker
+              value={roundDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              maximumDate={new Date()}
+              onChange={(_, d) => {
+                if (Platform.OS === 'android') setShowDatePicker(false);
+                if (d) { d.setHours(0, 0, 0, 0); setRoundDate(d); }
+              }}
+            />
+          ) : null}
+        </View>
+
+        {/* ── Course ── */}
+        <View style={styles.section}>
+          <RNText style={styles.sectionLabel}>Course</RNText>
+          {loading ? (
+            <Text style={styles.mutedText}>Loading courses…</Text>
+          ) : error ? (
+            <Text style={styles.errorText}>Error: {error}</Text>
+          ) : courses.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardText}>No courses yet. Add one first.</Text>
+              <View style={styles.emptyRow}>
+                <Pressable style={styles.smallBtn} onPress={() => router.push('/course/scan')}>
+                  <RNText style={styles.smallBtnText}>Scan scorecard</RNText>
                 </Pressable>
-              </Link>
-              <Link href="/course/new" asChild>
-                <Pressable style={styles.smallBtn}>
-                  <Text style={styles.smallBtnText}>Manual</Text>
+                <Pressable style={styles.smallBtn} onPress={() => router.push('/course/new')}>
+                  <RNText style={styles.smallBtnText}>Add manually</RNText>
                 </Pressable>
-              </Link>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.optionList}>
+              {courses.map((c) => {
+                const selected = selectedCourseId === c.id;
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => { setSelectedCourseId(c.id); setSelection(null); }}
+                    style={[styles.optionCard, selected && styles.optionCardSelected]}
+                  >
+                    <View style={[styles.optionRadio, selected && styles.optionRadioSelected]}>
+                      {selected ? <View style={styles.optionRadioDot} /> : null}
+                    </View>
+                    <RNText style={[styles.optionText, selected && styles.optionTextSelected]}>{c.name}</RNText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* ── What you're playing ── */}
+        {selectedCourseId ? (
+          <View style={styles.section}>
+            <RNText style={styles.sectionLabel}>What you're playing</RNText>
+            <RNText style={styles.sectionHint}>18-hole configs are rated for handicap. 9-hole rounds are unrated.</RNText>
+            {courseDetail.loading ? (
+              <Text style={styles.mutedText}>Loading options…</Text>
+            ) : courseDetail.error ? (
+              <Text style={styles.errorText}>Error: {courseDetail.error}</Text>
+            ) : selections.length === 0 ? (
+              <Text style={styles.mutedText}>No nines or configs found for this course.</Text>
+            ) : (
+              <View style={styles.optionList}>
+                {selections.map((s) => {
+                  const key = s.type === 'combo' ? `combo-${s.comboId}` : `nine-${s.nineId}`;
+                  const selected =
+                    selection?.type === s.type &&
+                    (s.type === 'combo'
+                      ? (selection as any).comboId === s.comboId
+                      : (selection as any).nineId === s.nineId);
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => setSelection(s)}
+                      style={[styles.optionCard, selected && styles.optionCardSelected]}
+                    >
+                      <View style={[styles.optionRadio, selected && styles.optionRadioSelected]}>
+                        {selected ? <View style={styles.optionRadioDot} /> : null}
+                      </View>
+                      <View style={styles.optionCardBody}>
+                        <RNText style={[styles.optionText, selected && styles.optionTextSelected]}>
+                          {s.label}
+                        </RNText>
+                        <RNText style={styles.optionBadge}>
+                          {s.type === 'combo' ? '18 holes' : '9 holes'}
+                        </RNText>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
+
+        {/* ── Tee ── */}
+        {selectedCourseId && courseDetail.data?.tees.length ? (
+          <View style={styles.section}>
+            <RNText style={styles.sectionLabel}>Tee</RNText>
+            <View style={styles.teeRow}>
+              {courseDetail.data.tees.map((t) => {
+                const selected = (selectedTeeId ?? courseDetail.data?.course.defaultTeeId) === t.id;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setSelectedTeeId(t.id)}
+                    style={[styles.teeChip, selected && styles.teeChipSelected]}
+                  >
+                    <RNText style={[styles.teeChipText, selected && styles.teeChipTextSelected]}>{t.name}</RNText>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         ) : null}
-      </View>
 
-      <Text style={styles.sectionTitle}>What you are playing</Text>
-      <Text style={styles.hint}>
-        18: uses a stored front/back pair. 9: one side only. You can fix rating and slope under Courses.
-      </Text>
-      {courseDetail.loading ? <Text>Loading options…</Text> : null}
-      {courseDetail.error ? <Text style={styles.error}>Error: {courseDetail.error}</Text> : null}
-
-      <View style={styles.list}>
-        {selections.map((s) => {
-          const key = s.type === 'combo' ? `combo-${s.comboId}` : `nine-${s.nineId}`;
-          const selected =
-            selection?.type === s.type &&
-            (s.type === 'combo'
-              ? (selection as any).comboId === s.comboId
-              : (selection as any).nineId === s.nineId);
-
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setSelection(s)}
-              style={[styles.item, selected && styles.itemSelected]}
-            >
-              <Text style={styles.itemText}>{s.type === 'combo' ? `18: ${s.label}` : `9: ${s.label}`}</Text>
-            </Pressable>
-          );
-        })}
-        {selectedCourseId && selections.length === 0 && !courseDetail.loading ? (
-          <Text>No nines/combos found for this course.</Text>
-        ) : null}
-      </View>
-
-      <Text style={styles.sectionTitle}>Tee</Text>
-      <Text style={styles.hint}>Which tee did you play today? (Used for showing correct yardages.)</Text>
-      {!selectedCourseId ? <Text style={styles.muted}>Pick a course first.</Text> : null}
-      {selectedCourseId && courseDetail.data?.tees.length ? (
-        <View style={styles.list}>
-          {courseDetail.data.tees.map((t) => (
-            <Pressable
-              key={t.id}
-              onPress={() => setSelectedTeeId(t.id)}
-              style={[styles.item, (selectedTeeId ?? courseDetail.data?.course.defaultTeeId) === t.id && styles.itemSelected]}
-            >
-              <Text style={styles.itemText}>{t.name}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : selectedCourseId && !courseDetail.loading ? (
-        <Text style={styles.error}>No tees found for this course.</Text>
-      ) : null}
-
-      <Pressable
-        onPress={onCreateRound}
-        disabled={!selectedCourseId || !selection || creating}
-        style={[styles.primaryButton, (!selectedCourseId || !selection || creating) && styles.primaryButtonDisabled]}
-      >
-        <Text style={styles.primaryButtonText}>{creating ? 'Creating…' : 'Start round'}</Text>
-      </Pressable>
-    </ScrollView>
+        {/* ── Start button ── */}
+        <Pressable
+          onPress={onCreateRound}
+          disabled={!canStart}
+          style={[styles.startBtn, !canStart && styles.startBtnDisabled]}
+        >
+          <RNText style={styles.startBtnText}>{creating ? 'Creating…' : 'Start round'}</RNText>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  lede: {
-    fontSize: 14,
-    fontWeight: '600',
-    opacity: 0.85,
-    lineHeight: 20,
-  },
-  dateButton: {
-    borderWidth: 1,
-    borderColor: '#999',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateButtonText: { fontSize: 17, fontWeight: '800' },
-  dateHint: { fontSize: 13, opacity: 0.6, fontWeight: '600' },
-  linkish: { fontSize: 14, fontWeight: '800', color: '#2f80ed' },
-  hint: { fontSize: 13, fontWeight: '600', opacity: 0.75, lineHeight: 18 },
-  emptyCourse: { gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' },
-  emptyCourseText: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  emptyRow: { flexDirection: 'row', gap: 10 },
-  smallBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#2f80ed',
-  },
-  smallBtnText: { color: 'white', fontWeight: '800' },
-  sectionTitle: {
-    marginTop: 8,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  list: {
-    gap: 8,
-  },
-  item: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#999',
-  },
-  itemSelected: {
-    borderColor: '#2f80ed',
-    backgroundColor: 'rgba(47, 128, 237, 0.12)',
-  },
-  itemText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  primaryButton: {
-    marginTop: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#2f80ed',
-    alignItems: 'center',
-  },
-  primaryButtonDisabled: {
-    opacity: 0.5,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  error: {
-    color: '#c62828',
-  },
-  muted: { fontWeight: '600', opacity: 0.7 },
-});
+  screen: { flex: 1, backgroundColor: colors.surface },
 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    gap: space[3],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', lineHeight: 22, color: colors.text },
+  headerSpacer: { width: 36 },
+
+  scroll: { flex: 1 },
+  content: { padding: space[4], gap: space[6], paddingBottom: space[12] },
+
+  section: { gap: space[3] },
+  sectionLabel: { fontSize: 13, fontWeight: '600', lineHeight: 18, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionHint: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.textMuted, marginTop: -space[1] },
+
+  mutedText: { ...typography.bodyS, color: colors.textMuted },
+  errorText: { ...typography.bodyS, color: colors.error },
+
+  // Date
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    paddingVertical: space[3],
+    paddingHorizontal: space[4],
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  dateBtnPressed: { backgroundColor: colors.surfaceContainer },
+  dateBtnText: { flex: 1, fontSize: 16, fontWeight: '600', lineHeight: 22, color: colors.text },
+  dateBtnSub: { fontSize: 13, fontWeight: '400', lineHeight: 18, color: colors.textMuted },
+
+  // Option cards (course / combo / nine)
+  optionList: { gap: space[2] },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    paddingVertical: space[3],
+    paddingHorizontal: space[4],
+    backgroundColor: colors.surfaceBright,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+  },
+  optionCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+  },
+  optionRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionRadioSelected: { borderColor: colors.primary },
+  optionRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  optionCardBody: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  optionText: { fontSize: 15, fontWeight: '500', lineHeight: 22, color: colors.text },
+  optionTextSelected: { color: colors.primary, fontWeight: '600' },
+  optionBadge: { fontSize: 12, fontWeight: '500', lineHeight: 16, color: colors.textMuted },
+
+  // Tee chips
+  teeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  teeChip: {
+    paddingVertical: space[2],
+    paddingHorizontal: space[4],
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceBright,
+  },
+  teeChipSelected: { borderColor: colors.primary, backgroundColor: colors.primaryContainer },
+  teeChipText: { fontSize: 14, fontWeight: '500', lineHeight: 20, color: colors.text },
+  teeChipTextSelected: { color: colors.primary, fontWeight: '600' },
+
+  // Empty state
+  emptyCard: {
+    gap: space[3],
+    padding: space[4],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceBright,
+  },
+  emptyCardText: { ...typography.bodyS, color: colors.textMuted },
+  emptyRow: { flexDirection: 'row', gap: space[2] },
+  smallBtn: {
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+  },
+  smallBtnText: { fontSize: 13, fontWeight: '600', lineHeight: 18, color: colors.primary },
+
+  // Start button
+  startBtn: {
+    paddingVertical: 15,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startBtnDisabled: { opacity: 0.4 },
+  startBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
+});

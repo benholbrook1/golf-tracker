@@ -444,24 +444,24 @@ const styles = StyleSheet.create({
   abandonedText: { ...typography.labelM, color: colors.error, fontWeight: '600' },
 
   primaryBtn: {
-    height: 52,
+    paddingVertical: 15,
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnDisabled: { opacity: 0.45 },
-  primaryBtnText: { ...typography.labelM, color: colors.onPrimary, fontWeight: '700', fontSize: 16 },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 
   abandonBtn: {
-    height: 44,
+    paddingVertical: 12,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.error,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  abandonBtnText: { ...typography.labelM, color: colors.error },
+  abandonBtnText: { fontSize: 14, fontWeight: '500', lineHeight: 20, color: colors.error },
 
   // ── Bottom nav ──
   bottomNav: {

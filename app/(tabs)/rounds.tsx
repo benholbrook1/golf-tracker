@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   content: { padding: space[4], gap: space[5] },
 
   newRoundBtn: {
-    height: 52,
+    paddingVertical: 15,
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     flexDirection: 'row',
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   newRoundBtnPressed: { opacity: 0.85 },
-  newRoundBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 22, color: colors.onPrimary },
+  newRoundBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
 
   section: { gap: space[3] },
   sectionLabel: { ...typography.labelM, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },

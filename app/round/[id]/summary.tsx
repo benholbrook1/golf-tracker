@@ -1,13 +1,35 @@
 import { useEffect, useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { Text } from '@/components/Themed';
 import { RoundSummary } from '@/components/RoundSummary';
 import { HandicapEngine } from '@/utils/handicap';
 import { useRound } from '@/hooks/useRound';
+import { colors, radius, space, typography } from '@/theme/tokens';
+
+function formatDate(date: string): string {
+  const d = new Date(date + 'T12:00:00');
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function RoundSummaryScreen() {
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <RoundSummaryInner />
+    </>
+  );
+}
+
+function RoundSummaryInner() {
   const params = useLocalSearchParams<{ id?: string }>();
   const roundId = params.id ?? null;
 
@@ -18,31 +40,22 @@ export default function RoundSummaryScreen() {
     if (!round || roundNines.length === 0) return null;
 
     const rows: Array<{ globalHole: number; par: number; strokes: number | null }> = [];
-
     for (const rn of roundNines) {
       const offset = (rn.nineOrder - 1) * 9;
       for (const ch of rn.courseHoles) {
         const existing = rn.holes.find((h) => h.holeNumber === ch.holeNumber) ?? null;
-        rows.push({
-          globalHole: offset + ch.holeNumber,
-          par: ch.par,
-          strokes: existing?.strokes ?? null,
-        });
+        rows.push({ globalHole: offset + ch.holeNumber, par: ch.par, strokes: existing?.strokes ?? null });
       }
     }
-
     rows.sort((a, b) => a.globalHole - b.globalHole);
 
     const totalPar = rows.reduce((s, r) => s + r.par, 0);
     const putts = roundNines.flatMap((rn) => rn.holes.map((h) => h.putts));
     const avgPutts = putts.length ? putts.reduce((s, p) => s + p, 0) / putts.length : null;
-
-    const girs: number[] = roundNines.flatMap((rn) => rn.holes.map((h) => (h.gir ? 1 : 0)));
+    const girs = roundNines.flatMap((rn) => rn.holes.map((h) => (h.gir ? 1 : 0)));
     const girPct = girs.length ? (girs.reduce((s, v) => s + v, 0) / girs.length) * 100 : null;
-
-    const fairways: number[] = roundNines.flatMap((rn) => rn.holes.map((h) => (h.fairwayHit ? 1 : 0)));
+    const fairways = roundNines.flatMap((rn) => rn.holes.map((h) => (h.fairwayHit ? 1 : 0)));
     const fairwayPct = fairways.length ? (fairways.reduce((s, v) => s + v, 0) / fairways.length) * 100 : null;
-
     const penalties = roundNines.flatMap((rn) => rn.holes.map((h) => h.penalties ?? 0));
     const totalPenalties = penalties.reduce((s, p) => s + p, 0);
 
@@ -53,168 +66,220 @@ export default function RoundSummaryScreen() {
     if (!roundId || !round) return;
     if (!round.isComplete) return;
     if (round.handicapDifferential != null) return;
-
-    // Per PLAN: differential computed on first load of summary for a complete 18-hole round
-    HandicapEngine.saveDifferential(roundId)
-      .then(refresh)
-      .catch(() => {
-        // swallow; UI can still render without differential
-      });
+    HandicapEngine.saveDifferential(roundId).then(refresh).catch(() => {});
   }, [roundId, round, refresh]);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading…</Text>
-      </View>
-    );
-  }
-
-  if (error || !round || !computed) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.error}>Error: {error ?? 'Round not found'}</Text>
-      </View>
-    );
-  }
-
+  const isAbandoned = round?.abandonedAt != null;
   const isNineHole = roundNines.length < 2;
   const maxHoles = isNineHole ? 9 : 18;
-  const holesPlayed = computed.rows.filter((r) => r.strokes != null).length;
+  const holesPlayed = computed?.rows.filter((r) => r.strokes != null).length ?? 0;
   const canComplete = holesPlayed === maxHoles;
-  const isAbandoned = round.abandonedAt != null;
+
+  const statusLabel = isAbandoned ? 'Abandoned' : round?.isComplete ? 'Complete' : 'In progress';
+  const statusColor = isAbandoned ? colors.error : round?.isComplete ? colors.success : colors.warning;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Round summary</Text>
-      <Text style={styles.subtitle}>{round.date}</Text>
-
-      {!round.isComplete && !isAbandoned ? (
-        <Pressable
-          onPress={() => completeRound()}
-          disabled={!canComplete}
-          style={[styles.primaryButton, !canComplete && styles.primaryButtonDisabled]}
-        >
-          <Text style={styles.primaryButtonText}>
-            {canComplete ? 'Mark round complete' : `Complete all ${maxHoles} holes to finish`}
-          </Text>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      {/* Fixed header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+          <FontAwesome name="chevron-left" size={16} color={colors.text} />
         </Pressable>
-      ) : null}
-      {isAbandoned ? <Text style={styles.abandoned}>Abandoned</Text> : null}
-
-      <RoundSummary
-        totalScore={totalScore}
-        totalPar={computed.totalPar}
-        avgPutts={computed.avgPutts}
-        girPct={computed.girPct}
-        fairwayPct={computed.fairwayPct}
-        totalPenalties={computed.totalPenalties}
-        differential={round.handicapDifferential ?? null}
-        scoreRows={computed.rows}
-        onEditHole={(h) => router.replace(`/round/${round.id}/play?hole=${h}`)}
-      />
-
-      <View style={styles.actionsRow}>
-        <Pressable
-          onPress={() => router.push({ pathname: '/round/new', params: { courseId: round.courseId } })}
-          style={styles.secondaryButton}
-        >
-          <Text style={styles.secondaryButtonText}>New round at this course</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/two')} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>View stats</Text>
-        </Pressable>
+        <View style={styles.headerCenter}>
+          <RNText style={styles.headerTitle}>Round Summary</RNText>
+          {round ? (
+            <RNText style={styles.headerSub}>
+              {formatDate(round.date)}
+              <RNText style={[styles.headerSub, { color: statusColor }]}> · {statusLabel}</RNText>
+            </RNText>
+          ) : null}
+        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {!round.isComplete && !isAbandoned ? (
-        <Pressable
-          onPress={() => {
-            Alert.alert('Abandon round?', 'This keeps the round for reference, but hides Resume.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Abandon', style: 'destructive', onPress: () => abandonRound() },
-            ]);
-          }}
-          style={styles.secondaryButton}
+      {/* Content */}
+      {loading ? (
+        <View style={styles.center}>
+          <Text style={styles.mutedText}>Loading…</Text>
+        </View>
+      ) : error || !round || !computed ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Error: {error ?? 'Round not found'}</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.secondaryButtonText}>Abandon round</Text>
-        </Pressable>
-      ) : null}
+          {/* Complete CTA */}
+          {!round.isComplete && !isAbandoned ? (
+            <Pressable
+              onPress={() => completeRound()}
+              disabled={!canComplete}
+              style={[styles.primaryBtn, !canComplete && styles.primaryBtnDisabled]}
+            >
+              <RNText style={styles.primaryBtnText}>
+                {canComplete ? 'Mark round complete' : `Score all ${maxHoles} holes first`}
+              </RNText>
+            </Pressable>
+          ) : null}
 
-      <Pressable
-        onPress={() => {
-          Alert.alert('Delete round?', 'This will remove the round from the app (soft delete).', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: async () => {
-                await deleteRound();
-                router.replace('/rounds');
-              },
-            },
-          ]);
-        }}
-        style={styles.dangerButton}
-      >
-        <Text style={styles.dangerButtonText}>Delete round</Text>
-      </Pressable>
-    </ScrollView>
+          {/* Summary stats + scorecard + edit grid */}
+          <RoundSummary
+            totalScore={totalScore}
+            totalPar={computed.totalPar}
+            avgPutts={computed.avgPutts}
+            girPct={computed.girPct}
+            fairwayPct={computed.fairwayPct}
+            totalPenalties={computed.totalPenalties}
+            differential={round.handicapDifferential ?? null}
+            scoreRows={computed.rows}
+            onEditHole={(h) => router.replace(`/round/${round.id}/play?hole=${h}`)}
+          />
+
+          {/* Action buttons */}
+          <View style={styles.actions}>
+            <Pressable
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+              onPress={() => router.push({ pathname: '/round/new', params: { courseId: round.courseId } })}
+            >
+              <FontAwesome name="plus" size={13} color={colors.primary} />
+              <RNText style={styles.secondaryBtnText}>New round at this course</RNText>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+              onPress={() => router.push('/two')}
+            >
+              <FontAwesome name="bar-chart" size={13} color={colors.primary} />
+              <RNText style={styles.secondaryBtnText}>View stats</RNText>
+            </Pressable>
+
+            {!round.isComplete && !isAbandoned ? (
+              <Pressable
+                style={({ pressed }) => [styles.ghostBtn, pressed && styles.btnPressed]}
+                onPress={() => {
+                  Alert.alert(
+                    'Abandon round?',
+                    'This keeps the round for reference, but removes it from Resume.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Abandon', style: 'destructive', onPress: () => abandonRound() },
+                    ],
+                  );
+                }}
+              >
+                <RNText style={styles.ghostBtnText}>Abandon round</RNText>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={({ pressed }) => [styles.dangerBtn, pressed && styles.btnPressed]}
+              onPress={() => {
+                Alert.alert('Delete round?', 'This permanently removes the round from your history.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await deleteRound();
+                      router.replace('/rounds');
+                    },
+                  },
+                ]);
+              }}
+            >
+              <RNText style={styles.dangerBtnText}>Delete round</RNText>
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  subtitle: {
-    opacity: 0.8,
-  },
-  primaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#2f80ed',
-    alignItems: 'center',
-  },
-  primaryButtonDisabled: {
-    opacity: 0.5,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  actionsRow: { gap: 8, marginTop: 4 },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2f80ed',
-    alignItems: 'center',
-  },
-  secondaryButtonText: { color: '#2f80ed', fontSize: 16, fontWeight: '800' },
-  abandoned: { fontSize: 14, fontWeight: '900', color: '#c62828' },
-  dangerButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#c62828',
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    color: '#c62828',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  error: {
-    color: '#c62828',
-  },
-});
+  screen: { flex: 1, backgroundColor: colors.surface },
 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    backgroundColor: colors.surfaceBright,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
+    gap: space[3],
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: { flex: 1, gap: 2 },
+  headerTitle: { fontSize: 17, fontWeight: '600', color: colors.text, lineHeight: 22 },
+  headerSub: { fontSize: 13, fontWeight: '400', color: colors.textMuted, lineHeight: 18 },
+  headerSpacer: { width: 36 },
+
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[6] },
+  mutedText: { ...typography.bodyM, color: colors.textMuted },
+  errorText: { ...typography.bodyM, color: colors.error },
+
+  scroll: { flex: 1 },
+  content: { padding: space[4], gap: space[5], paddingBottom: space[12] },
+
+  primaryBtn: {
+    paddingVertical: 15,
+    paddingHorizontal: space[4],
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnDisabled: { opacity: 0.45 },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: colors.onPrimary },
+
+  actions: { gap: space[3] },
+
+  secondaryBtn: {
+    paddingVertical: 13,
+    paddingHorizontal: space[4],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+  },
+  secondaryBtnText: { fontSize: 15, fontWeight: '600', lineHeight: 22, color: colors.primary },
+
+  ghostBtn: {
+    paddingVertical: 13,
+    paddingHorizontal: space[4],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ghostBtnText: { fontSize: 15, fontWeight: '500', lineHeight: 22, color: colors.textMuted },
+
+  dangerBtn: {
+    paddingVertical: 13,
+    paddingHorizontal: space[4],
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerBtnText: { fontSize: 15, fontWeight: '600', lineHeight: 22, color: colors.error },
+
+  btnPressed: { opacity: 0.7 },
+});
